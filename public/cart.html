@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your cart | Janissary Wear</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23B4232C'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hind+Siliguri:wght@400;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="chrome-top"></div>
+  <main class="wrap" id="root"><div class="skeleton" style="height:320px;margin:3rem 0"></div></main>
+  <div id="chrome-bottom"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    JW.renderChrome('');
+    const root = document.getElementById('root');
+    let products = [], settings = { shippingInside: 70, shippingOutside: 130, freeShippingOver: 0 }, area = 'inside';
+
+    // cart lines joined with live product data (price, stock)
+    function lines() {
+      return JW.cart.get().map((c) => ({ ...c, p: products.find((p) => p.id === c.id) })).filter((l) => l.p);
+    }
+    function totals() {
+      const subtotal = lines().reduce((n, l) => n + JW.unitPrice(l.p) * l.qty, 0);
+      const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
+      const shipping = !subtotal || free ? 0 : area === 'outside' ? settings.shippingOutside : settings.shippingInside;
+      return { subtotal, shipping, total: subtotal + shipping, free };
+    }
+
+    function render() {
+      // drop items whose product vanished
+      const valid = JW.cart.get().filter((c) => products.some((p) => p.id === c.id));
+      if (valid.length !== JW.cart.get().length) JW.cart.set(valid);
+      const ls = lines();
+
+      if (!ls.length) {
+        root.innerHTML = `<div class="empty" style="margin:3rem 0 4.5rem"><h3>Your cart is empty</h3><p>Add something you like and it will wait for you here.</p><a class="btn btn-dark" href="/products">Browse products</a></div>`;
+        return;
+      }
+      const t = totals();
+      root.innerHTML = `
+        <div class="page-head" style="padding-bottom:1.2rem;border:0"><h1 style="font-size:clamp(2.2rem,5vw,3.4rem)">Your cart</h1></div>
+        <div class="cart-layout">
+          <div id="items">${ls.map((l, i) => `
+            <div class="cart-row">
+              <a class="cart-thumb" href="/product?id=${encodeURIComponent(l.p.id)}">${l.p.images[0] ? `<img src="${JW.esc(l.p.images[0])}" alt="">` : `<div class="ph">${JW.STAR('#1A2A5C', '#B08A3A')}</div>`}</a>
+              <div>
+                <a href="/product?id=${encodeURIComponent(l.p.id)}" style="font-weight:600">${JW.esc(l.p.name)}</a>
+                <div class="cart-meta">${[l.size && 'Size ' + JW.esc(l.size), l.color && JW.esc(l.color)].filter(Boolean).join(', ') || '&nbsp;'}</div>
+                <div class="cart-meta">${JW.money(JW.unitPrice(l.p))} each${l.p.stock < l.qty ? ` <b style="color:var(--red)">(only ${l.p.stock} in stock)</b>` : ''}</div>
+                <div class="qty small" style="margin-top:.6rem">
+                  <button type="button" data-act="minus" data-i="${i}" aria-label="Decrease quantity">&minus;</button>
+                  <input type="number" value="${l.qty}" min="1" max="20" data-i="${i}" aria-label="Quantity">
+                  <button type="button" data-act="plus" data-i="${i}" aria-label="Increase quantity">+</button>
+                </div>
+              </div>
+              <div class="cart-right">
+                <b>${JW.money(JW.unitPrice(l.p) * l.qty)}</b>
+                <button class="cart-remove" data-act="remove" data-i="${i}">Remove</button>
+              </div>
+            </div>`).join('')}
+          </div>
+
+          <form class="panel" id="form" novalidate>
+            <h2>Delivery details</h2>
+            <div class="field"><label for="name">Full name</label><input class="input" id="name" autocomplete="name" required></div>
+            <div class="field"><label for="phone">Phone number</label><input class="input" id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="01XXXXXXXXX" required></div>
+            <div class="field"><label for="address">Full address</label><textarea class="textarea" id="address" autocomplete="street-address" placeholder="House, road, area, city" required></textarea></div>
+            <div class="field"><span class="lbl">Delivery area</span>
+              <div class="radio-row">
+                <label><span><input type="radio" name="area" value="inside" ${area === 'inside' ? 'checked' : ''}> Inside Dhaka</span><span>${JW.money(settings.shippingInside)}</span></label>
+                <label><span><input type="radio" name="area" value="outside" ${area === 'outside' ? 'checked' : ''}> Outside Dhaka</span><span>${JW.money(settings.shippingOutside)}</span></label>
+              </div>
+            </div>
+            <div class="field"><label for="note">Note (optional)</label><input class="input" id="note" placeholder="Anything we should know?"></div>
+
+            <div style="margin-top:1.4rem">
+              <div class="sum-line"><span>Subtotal</span><span>${JW.money(t.subtotal)}</span></div>
+              <div class="sum-line"><span>Delivery</span><span>${t.free ? 'Free' : JW.money(t.shipping)}</span></div>
+              <div class="sum-total"><span>Total</span><span>${JW.money(t.total)}</span></div>
+            </div>
+            <button class="btn btn-primary btn-block" id="place" type="submit" style="margin-top:1.3rem">Place order, pay on delivery</button>
+            <div class="form-error" id="err" role="alert"></div>
+            <p class="note">You pay in cash when the parcel reaches you.</p>
+          </form>
+        </div>`;
+
+      // events
+      root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+        const items = JW.cart.get(); const l = ls[+b.dataset.i];
+        const idx = items.findIndex((c) => c.id === l.id && c.size === l.size && c.color === l.color);
+        if (idx < 0) return;
+        if (b.dataset.act === 'remove') items.splice(idx, 1);
+        else items[idx].qty = Math.max(1, Math.min(20, items[idx].qty + (b.dataset.act === 'plus' ? 1 : -1)));
+        keepForm(() => { JW.cart.set(items); render(); });
+      }));
+      root.querySelectorAll('.qty input').forEach((inp) => inp.addEventListener('change', () => {
+        const items = JW.cart.get(); const l = ls[+inp.dataset.i];
+        const idx = items.findIndex((c) => c.id === l.id && c.size === l.size && c.color === l.color);
+        if (idx >= 0) items[idx].qty = Math.max(1, Math.min(20, parseInt(inp.value) || 1));
+        keepForm(() => { JW.cart.set(items); render(); });
+      }));
+      root.querySelectorAll('input[name=area]').forEach((r) => r.addEventListener('change', () => { keepForm(() => { area = r.value; render(); }); }));
+      document.getElementById('form').addEventListener('submit', submit);
+    }
+
+    // re-render without losing what the customer already typed
+    function keepForm(fn) {
+      const keep = ['name', 'phone', 'address', 'note'].map((id) => [id, (document.getElementById(id) || {}).value || '']);
+      fn();
+      keep.forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
+    }
+
+    async function submit(e) {
+      e.preventDefault();
+      const err = document.getElementById('err'); err.textContent = '';
+      const btn = document.getElementById('place');
+      const customer = {
+        name: document.getElementById('name').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        note: document.getElementById('note').value.trim(),
+        area,
+      };
+      if (!customer.name) return (err.textContent = 'Please enter your name.');
+      if (!/^[0-9+\-\s]{10,16}$/.test(customer.phone)) return (err.textContent = 'Please enter a valid phone number.');
+      if (!customer.address) return (err.textContent = 'Please enter your delivery address.');
+
+      btn.disabled = true; btn.textContent = 'Placing order...';
+      try {
+        const items = JW.cart.get().map(({ id, size, color, qty }) => ({ id, size, color, qty }));
+        const r = await JW.api('orders', { method: 'POST', body: { customer, items } });
+        JW.cart.clear();
+        root.innerHTML = `<div class="success">${JW.STAR('#B4232C', '#D8B35A')}<h1>Order placed</h1>
+          <p>Your order number is <b>${JW.esc(r.number)}</b>.</p>
+          <p>Please keep ${JW.money(r.total)} ready for the delivery person.</p>
+          <a class="btn btn-dark" href="/products">Continue shopping</a></div>`;
+        window.scrollTo({ top: 0 });
+      } catch (ex) {
+        err.textContent = ex.message;
+        btn.disabled = false; btn.textContent = 'Place order, pay on delivery';
+      }
+    }
+
+    Promise.all([JW.api('products'), JW.loadSettings()]).then(([p, s]) => { products = p; settings = s; render(); })
+      .catch((e) => { root.innerHTML = `<div class="empty" style="margin:3rem 0"><h3>Could not load your cart</h3><p>${JW.esc(e.message)}</p></div>`; });
+  </script>
+</body>
+</html>

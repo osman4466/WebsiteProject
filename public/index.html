@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Janissary Wear | Streetwear drawn from the Janissary legacy</title>
+  <meta name="description" content="Heavyweight hoodies, tees and jackets drawn from the Janissary orders. Cash on delivery across Bangladesh.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23B4232C'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hind+Siliguri:wght@400;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="chrome-top"></div>
+
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <h1>Wear the legacy.</h1>
+          <p>Heavyweight hoodies, tees and jackets drawn from the Janissary orders. Order today and pay when it arrives at your door.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/products">Shop the collection</a>
+            <a class="btn btn-ghost" href="/categories">Browse categories</a>
+          </div>
+        </div>
+      </div>
+      <div class="standard" aria-hidden="true">
+        <span class="standard-name store-name">Janissary Wear</span>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="cat-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div><h2 id="cat-h">Shop by category</h2></div>
+          <a class="link-more" href="/categories">All categories</a>
+        </div>
+        <div class="cat-grid" id="cats"></div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0" aria-labelledby="new-h">
+      <div class="wrap">
+        <div class="section-head">
+          <div><h2 id="new-h">New arrivals</h2></div>
+          <a class="link-more" href="/products">All products</a>
+        </div>
+        <div class="product-grid" id="new"></div>
+      </div>
+    </section>
+
+    <section class="band on-dark" aria-label="Delivery">
+      <div class="wrap band-grid" id="band"></div>
+    </section>
+  </main>
+
+  <div id="chrome-bottom"></div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    JW.renderChrome('home');
+    document.querySelector('.standard').insertAdjacentHTML('afterbegin', JW.STAR('#FAFAF7', '#B4232C'));
+
+    const skel = (n) => Array.from({ length: n }, () => '<div class="skeleton" style="aspect-ratio:4/5"></div>').join('');
+    document.getElementById('cats').innerHTML = skel(4).replaceAll('4/5', '3/4');
+    document.getElementById('new').innerHTML = skel(4);
+
+    Promise.all([JW.api('categories'), JW.api('products?limit=8')]).then(([cats, products]) => {
+      const catBox = document.getElementById('cats');
+      catBox.innerHTML = cats.length ? cats.map((c) => JW.catTile(c)).join('') : '<div class="empty" style="grid-column:1/-1"><h3>Categories are on the way</h3><p>Check back soon.</p></div>';
+
+      const box = document.getElementById('new');
+      box.innerHTML = products.length
+        ? products.map((p) => JW.productCard(p, cats)).join('')
+        : '<div class="empty" style="grid-column:1/-1"><h3>The first drop is being prepared</h3><p>New pieces will appear here as soon as they are added.</p></div>';
+    }).catch((e) => {
+      document.getElementById('new').innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div>`;
+      document.getElementById('cats').innerHTML = '';
+    });
+
+    document.addEventListener('jw:settings', (ev) => {
+      const s = ev.detail;
+      const free = s.freeShippingOver > 0 ? `Free delivery on orders over ${JW.money(s.freeShippingOver)}.` : '';
+      document.getElementById('band').innerHTML = `
+        <div>${JW.STAR('#D8B35A', '#B4232C').replace('<svg', '<svg class="star"')}<h3>Pay on delivery</h3><p>Check your order first, then pay the courier. No card needed.</p></div>
+        <div>${JW.STAR('#D8B35A', '#B4232C').replace('<svg', '<svg class="star"')}<h3>Inside Dhaka ${JW.money(s.shippingInside)}</h3><p>Outside Dhaka ${JW.money(s.shippingOutside)}. ${JW.esc(free)}</p></div>
+        <div>${JW.STAR('#D8B35A', '#B4232C').replace('<svg', '<svg class="star"')}<h3>No account needed</h3><p>Pick your size, add your address and place the order in a minute.</p></div>`;
+    });
+  </script>
+</body>
+</html>

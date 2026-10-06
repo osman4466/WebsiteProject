@@ -1,0 +1,12 @@
+{
+  "name": "janissary-wear",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Janissary Wear - e-commerce website with admin panel (Vercel + Upstash Redis)",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin | Janissary Wear</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23B4232C'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hind+Siliguri:wght@400;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin">
+
+  <!-- Login -->
+  <section class="login on-dark" id="login">
+    <form class="login-card" id="loginForm">
+      <div class="login-brand" id="loginStar"></div>
+      <h1>Admin login</h1>
+      <p>Sign in to manage products, categories and orders.</p>
+      <div class="field"><label for="email">Email</label><input class="input" id="email" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="password">Password</label><input class="input" id="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary btn-block" id="loginBtn" type="submit">Log in</button>
+      <div class="form-error" id="loginErr" role="alert"></div>
+      <a class="back-link" href="/">Back to the store</a>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div class="app" id="app" hidden>
+    <aside class="side on-dark">
+      <a class="brand" href="/admin" id="sideBrand"><span class="store-name">Janissary Wear</span></a>
+      <nav id="sideNav" aria-label="Admin sections">
+        <a href="#overview" data-view="overview">Overview</a>
+        <a href="#products" data-view="products">Products</a>
+        <a href="#categories" data-view="categories">Categories</a>
+        <a href="#orders" data-view="orders">Orders <span class="pill" id="pendingPill" hidden>0</span></a>
+        <a href="#settings" data-view="settings">Store settings</a>
+      </nav>
+      <div class="side-foot">
+        <a href="/" target="_blank" rel="noopener">View store</a>
+        <button type="button" id="logout">Log out</button>
+      </div>
+    </aside>
+    <main class="main">
+      <div id="view" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <dialog id="dlg"></dialog>
+
+  <script src="/js/app.js"></script>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>
