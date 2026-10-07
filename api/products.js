@@ -1,6 +1,6 @@
 const {
   send, getQuery, getBody, getProducts, getCategories, dbSet, isAdmin,
-  requireAdmin, uid, clean,
+  requireAdmin, uid, clean, withDescendants,
 } = require('./_lib');
 
 function normalize(b, cur = {}) {
@@ -39,7 +39,11 @@ module.exports = async (req, res) => {
         const p = list.find((x) => x.id === q.id);
         return p ? send(res, 200, p) : send(res, 404, { error: 'Product not found' });
       }
-      if (q.category) list = list.filter((p) => p.category === q.category);
+      if (q.category) {
+        // a main category (like Men) also shows everything inside its sub-categories
+        const slugs = withDescendants(await getCategories(), q.category);
+        list = list.filter((p) => slugs.includes(p.category));
+      }
       if (q.featured) list = list.filter((p) => p.featured);
       if (q.q) {
         const t = String(q.q).toLowerCase();

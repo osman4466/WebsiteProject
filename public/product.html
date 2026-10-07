@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Product | Janissary Wear</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23B4232C'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hind+Siliguri:wght@400;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
 
   <script src="/js/app.js"></script>
   <script>
-    JW.renderChrome('products');
+    JW.renderChrome();
     const root = document.getElementById('root');
     const id = new URLSearchParams(location.search).get('id');
     let settings = {};
@@ -44,22 +44,24 @@
         `</div></div>`;
     }
 
-    Promise.all([JW.api('products?id=' + encodeURIComponent(id || '')), JW.api('categories')]).then(([p, cats]) => {
+    Promise.all([JW.api('products?id=' + encodeURIComponent(id || '')), JW.loadCats()]).then(([p, cats]) => {
       window.__p = p;
-      const cat = cats.find((c) => c.slug === p.category);
+      const cat = JW.bySlug(p.category, cats);
+      const parent = cat && cat.parent ? JW.bySlug(cat.parent, cats) : null;
+      JW.setActive(p.category);
       document.title = p.name + ' | Janissary Wear';
       const out = p.stock <= 0;
       const imgs = p.images.length ? p.images : [];
 
       root.innerHTML = `
-        <div class="crumbs" style="padding-top:1.6rem"><a href="/">Home</a> / ${cat ? `<a href="/products?category=${encodeURIComponent(cat.slug)}">${JW.esc(cat.name)}</a> / ` : ''}${JW.esc(p.name)}</div>
+        <div class="crumbs" style="padding-top:1.6rem"><a href="/">Home</a> / ${parent ? `<a href="${JW.catUrl(parent.slug)}">${JW.esc(parent.name)}</a> / ` : ''}${cat ? `<a href="${JW.catUrl(cat.slug)}">${JW.esc(cat.name)}</a> / ` : ''}${JW.esc(p.name)}</div>
         <div class="pdp" style="padding-top:1rem">
           <div>
-            <div class="gallery-main" id="main">${imgs.length ? `<img src="${JW.esc(imgs[0])}" alt="${JW.esc(p.name)}">` : `<div class="ph">${JW.STAR('#1A2A5C', '#B08A3A')}</div>`}</div>
+            <div class="gallery-main" id="main">${imgs.length ? `<img src="${JW.esc(imgs[0])}" alt="${JW.esc(p.name)}">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</div>
             ${imgs.length > 1 ? `<div class="thumbs">${imgs.map((s, i) => `<button class="thumb${i === 0 ? ' active' : ''}" data-src="${JW.esc(s)}" aria-label="Show photo ${i + 1}"><img src="${JW.esc(s)}" alt=""></button>`).join('')}</div>` : ''}
           </div>
           <div class="pdp-info">
-            ${cat ? `<a class="product-cat" href="/products?category=${encodeURIComponent(cat.slug)}">${JW.esc(cat.name)}</a>` : ''}
+            ${cat ? `<a class="product-cat" href="${JW.catUrl(cat.slug)}">${JW.esc(JW.catPath(cat.slug, cats))}</a>` : ''}
             <h1>${JW.esc(p.name)}</h1>
             <div class="pdp-price"><span class="now${JW.onSale(p) ? ' sale' : ''}">${JW.money(JW.unitPrice(p))}</span>${JW.onSale(p) ? `<s>${JW.money(p.price)}</s>` : ''}</div>
             ${p.description ? `<p class="pdp-desc">${JW.esc(p.description)}</p>` : ''}

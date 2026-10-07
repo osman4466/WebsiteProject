@@ -14,11 +14,25 @@
       .catch((e) => { if (/Unauthorized/i.test(e.message)) logout('Your session ended. Please log in again.'); throw e; });
 
   const fmtDate = (t) => new Date(t).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const catName = (slug) => (S.cats.find((c) => c.slug === slug) || {}).name || slug;
+  const catName = (slug) => JW.catPath(slug, S.cats) || slug;
+  const mainCats = () => S.cats.filter((c) => !c.parent);
+  const subCats = (slug) => S.cats.filter((c) => c.parent === slug);
+  const ownCount = (slug) => S.products.filter((p) => p.category === slug).length;
+  const totalCount = (slug) => ownCount(slug) + subCats(slug).reduce((n, c) => n + ownCount(c.slug), 0);
+
+  // <option> list for choosing a category: sub-categories grouped under their main category
+  function catOptions(selected) {
+    const opt = (c, label) => `<option value="${esc(c.slug)}"${c.slug === selected ? ' selected' : ''}>${esc(label)}</option>`;
+    return mainCats().map((t) => {
+      const kids = subCats(t.slug);
+      if (!kids.length) return opt(t, t.name);
+      return `<optgroup label="${esc(t.name)}">${kids.map((k) => opt(k, k.name)).join('')}${opt(t, t.name + ' (general)')}</optgroup>`;
+    }).join('');
+  }
   const waNumber = (p) => { let n = String(p || '').replace(/\D/g, ''); if (n.startsWith('0')) n = '88' + n; return n; };
 
   // ---------- login / logout ----------
-  $('#loginStar').innerHTML = STAR('#B4232C', '#D8B35A');
+  $('#loginStar').innerHTML = STAR('#0A0A0A', '#D8B35A');
 
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -183,7 +197,7 @@
   function openProduct(id) {
     if (!S.cats.length) { toast('Create a category first', true); location.hash = '#categories'; return; }
     const p = id ? S.products.find((x) => x.id === id) : null;
-    const d = p || { name: '', description: '', price: '', salePrice: '', category: S.cats[0].slug, images: [], sizes: [], colors: [], stock: 10, featured: false, active: true };
+    const d = p || { name: '', description: '', price: '', salePrice: '', category: (S.cats.find((c) => c.parent) || S.cats[0]).slug, images: [], sizes: [], colors: [], stock: 10, featured: false, active: true };
     let imgs = [...d.images]; const original = [...d.images]; const uploaded = []; let saved = false; let busy = 0;
 
     dlg.innerHTML = `
@@ -192,7 +206,7 @@
         <div class="dlg-body">
           <div class="field"><label for="f-name">Product name</label><input class="input" id="f-name" value="${esc(d.name)}" maxlength="120" required></div>
           <div class="row2">
-            <div class="field"><label for="f-cat">Category</label><select class="select" id="f-cat">${S.cats.map((c) => `<option value="${esc(c.slug)}"${c.slug === d.category ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+            <div class="field"><label for="f-cat">Category</label><select class="select" id="f-cat">${catOptions(d.category)}</select></div>
             <div class="field"><label for="f-stock">Stock (pieces)</label><input class="input" id="f-stock" type="number" min="0" step="1" value="${esc(d.stock)}"></div>
           </div>
           <div class="row2">
@@ -305,23 +319,32 @@
 
   // ---------- categories ----------
   function categories() {
+    const rows = [];
+    const row = (c, child) => {
+      const n = child ? ownCount(c.slug) : totalCount(c.slug);
+      return `<tr>
+        <td><div class="t-name" style="${child ? 'padding-left:28px' : ''}"><div class="t-thumb">${c.image ? `<img src="${esc(c.image)}" alt="">` : ''}</div>
+          <div>${child ? '' : '<b>'}${esc(c.name)}${child ? '' : '</b>'}<div class="muted">${child ? 'Sub-category of ' + esc(catName(c.parent)) : 'Main category'}</div></div></div></td>
+        <td class="num">${n}</td>
+        <td><div class="t-actions">
+          ${child ? '' : `<button class="btn btn-dark btn-sm" data-act="newSub" data-id="${esc(c.id)}">Add sub-category</button>`}
+          <button class="btn btn-ghost btn-sm" data-act="editCat" data-id="${esc(c.id)}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-act="delCat" data-id="${esc(c.id)}">Delete</button></div></td>
+      </tr>`;
+    };
+    mainCats().forEach((t) => { rows.push(row(t, false)); subCats(t.slug).forEach((k) => rows.push(row(k, true))); });
+
     view.innerHTML = `
-      <div class="view-head"><div><h1>Categories</h1><p>Group your products so customers can find them.</p></div>
+      <div class="view-head"><div><h1>Categories</h1><p>Main categories (like Men and Women) hold sub-categories (like T-Shirt or Polo Shirt). Add products inside the sub-categories.</p></div>
         <button class="btn btn-primary" data-act="newCat">Add category</button></div>
       ${S.cats.length ? `<div class="table-wrap"><table class="t">
-        <thead><tr><th>Category</th><th>Description</th><th class="num">Products</th><th></th></tr></thead>
-        <tbody>${S.cats.map((c) => {
-          const n = S.products.filter((p) => p.category === c.slug).length;
-          return `<tr>
-            <td><div class="t-name"><div class="t-thumb">${c.image ? `<img src="${esc(c.image)}" alt="">` : ''}</div><div>${esc(c.name)}<div class="muted">/${esc(c.slug)}</div></div></div></td>
-            <td class="muted">${esc(c.description) || '-'}</td>
-            <td class="num">${n}</td>
-            <td><div class="t-actions"><button class="btn btn-ghost btn-sm" data-act="editCat" data-id="${esc(c.id)}">Edit</button><button class="btn btn-danger btn-sm" data-act="delCat" data-id="${esc(c.id)}">Delete</button></div></td>
-          </tr>`; }).join('')}</tbody></table></div>`
-        : `<div class="empty"><h3>No categories yet</h3><p>Create a category like Hoodies or T-Shirts before adding products.</p><button class="btn btn-primary" data-act="newCat">Add category</button></div>`}`;
+        <thead><tr><th>Category</th><th class="num">Products</th><th></th></tr></thead>
+        <tbody>${rows.join('')}</tbody></table></div>`
+        : `<div class="empty"><h3>No categories yet</h3><p>Start with a main category like Men or Women.</p><button class="btn btn-primary" data-act="newCat">Add category</button></div>`}`;
   }
 
   actions.newCat = () => openCat();
+  actions.newSub = (id) => { const c = S.cats.find((x) => x.id === id); if (c) openCat(null, c.slug); };
   actions.editCat = (id) => openCat(id);
   actions.delCat = async (id) => {
     const c = S.cats.find((x) => x.id === id);
@@ -334,21 +357,27 @@
     } catch (e) { toast(e.message, true); }
   };
 
-  function openCat(id) {
+  function openCat(id, presetParent) {
     const c = id ? S.cats.find((x) => x.id === id) : null;
-    const d = c || { name: '', description: '', image: '' };
+    const d = c || { name: '', description: '', image: '', parent: presetParent || '' };
+    const hasKids = c ? subCats(c.slug).length > 0 : false;
     let img = d.image; const original = d.image; const uploaded = []; let saved = false; let busy = false;
+    const parentOpts = `<option value="">None, this is a main category (like Men)</option>` +
+      mainCats().filter((t) => !c || t.slug !== c.slug).map((t) => `<option value="${esc(t.slug)}"${t.slug === d.parent ? ' selected' : ''}>Inside ${esc(t.name)}</option>`).join('');
 
     dlg.innerHTML = `
-      <div class="dlg-head"><h2>${c ? 'Edit category' : 'Add category'}</h2><button class="dlg-x" type="button" data-close aria-label="Close">&times;</button></div>
+      <div class="dlg-head"><h2>${c ? 'Edit category' : (presetParent ? 'Add sub-category' : 'Add category')}</h2><button class="dlg-x" type="button" data-close aria-label="Close">&times;</button></div>
       <form id="cf" novalidate style="display:contents">
         <div class="dlg-body">
-          <div class="field"><label for="c-name">Category name</label><input class="input" id="c-name" value="${esc(d.name)}" maxlength="60" required>${c ? '<div class="hint">The web address of the category stays the same when you rename it.</div>' : ''}</div>
-          <div class="field"><label for="c-desc">Short description</label><input class="input" id="c-desc" value="${esc(d.description)}" maxlength="300" placeholder="Shown on the categories page"></div>
+          <div class="field"><label for="c-name">Category name</label><input class="input" id="c-name" value="${esc(d.name)}" maxlength="60" placeholder="For example: Polo Shirt" required>${c ? '<div class="hint">The web address of the category stays the same when you rename it.</div>' : ''}</div>
+          <div class="field"><label for="c-parent">Where does it go?</label>
+            <select class="select" id="c-parent"${hasKids ? ' disabled' : ''}>${parentOpts}</select>
+            <div class="hint">${hasKids ? 'This category has sub-categories, so it stays a main category.' : 'Choose "Inside Men" to make a sub-category like T-Shirt under Men.'}</div></div>
+          <div class="field"><label for="c-desc">Short description</label><input class="input" id="c-desc" value="${esc(d.description)}" maxlength="300" placeholder="Optional. Shown on the category page"></div>
           <div class="field"><span class="lbl">Cover photo</span>
             <div class="img-grid" id="cImg"></div>
             <div class="upload-row"><label class="btn btn-ghost btn-sm" for="c-file" style="cursor:pointer">Upload photo</label><input id="c-file" type="file" accept="image/jpeg,image/png,image/webp"></div>
-            <div class="hint">Optional. A tall (3:4) photo looks best.</div>
+            <div class="hint">Optional. Main categories look best with a wide photo, sub-categories with a tall one.</div>
           </div>
         </div>
         <div class="dlg-foot"><div class="form-error" id="cf-err" role="alert"></div>
@@ -374,6 +403,7 @@
       e.preventDefault();
       const err = $('#cf-err', dlg); err.textContent = '';
       const body = { name: $('#c-name', dlg).value.trim(), description: $('#c-desc', dlg).value.trim(), image: img };
+      if (!hasKids) body.parent = $('#c-parent', dlg).value;
       if (!body.name) return (err.textContent = 'Please enter a category name.');
       if (busy) return (err.textContent = 'Please wait until the photo finishes uploading.');
       const btn = $('#cf-save', dlg); btn.disabled = true; btn.textContent = 'Saving...';

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>All products | Janissary Wear</title>
-  <meta name="description" content="Shop every Janissary Wear piece. Filter by category, search by name, pay on delivery.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23B4232C'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <meta name="description" content="Shop every Janissary Wear piece for men and women. Filter by style, search by name, pay on delivery.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gloock&family=Hind+Siliguri:wght@400;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,7 +22,7 @@
 
     <div class="wrap">
       <div class="filters">
-        <div class="chips" id="chips" role="tablist" aria-label="Filter by category"></div>
+        <div class="chips" id="chips" aria-label="Filter by category"></div>
         <div class="tools">
           <label class="sr-only" for="q">Search products</label>
           <input class="input" id="q" type="search" placeholder="Search products">
@@ -34,6 +34,7 @@
           </select>
         </div>
       </div>
+      <div class="chips sub" id="subchips" aria-label="Filter by style" hidden></div>
       <div class="product-grid" id="grid" style="padding-bottom:4.5rem"></div>
     </div>
   </main>
@@ -41,9 +42,9 @@
 
   <script src="/js/app.js"></script>
   <script>
-    JW.renderChrome('products');
+    JW.renderChrome();
     const params = new URLSearchParams(location.search);
-    let active = params.get('category') || '';
+    let active = params.get('category') || '';     // slug of a main category or a sub-category, '' = everything
     let all = [], cats = [];
     const grid = document.getElementById('grid');
     const qEl = document.getElementById('q');
@@ -52,40 +53,61 @@
 
     grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton" style="aspect-ratio:4/5"></div>').join('');
 
+    // every slug that belongs to the chosen category (itself plus its sub-categories)
+    const slugsFor = (slug) => [slug, ...JW.kidsOf(slug, cats).map((k) => k.slug)];
+
     function drawChips() {
-      const chips = [{ slug: '', name: 'All' }, ...cats];
-      document.getElementById('chips').innerHTML = chips.map((c) =>
-        `<button class="chip${c.slug === active ? ' active' : ''}" data-slug="${JW.esc(c.slug)}" aria-pressed="${c.slug === active}">${JW.esc(c.name)}</button>`).join('');
+      const top = active ? JW.topOf(active, cats) : null;
+      const main = [{ slug: '', name: 'All' }, ...JW.tops(cats)];
+      const topSlug = top ? top.slug : '';
+      document.getElementById('chips').innerHTML = main.map((c) =>
+        `<button class="chip${c.slug === topSlug ? ' active' : ''}" data-slug="${JW.esc(c.slug)}" aria-pressed="${c.slug === topSlug}">${JW.esc(c.name)}</button>`).join('');
+
+      const sub = document.getElementById('subchips');
+      const kids = top ? JW.kidsOf(top.slug, cats) : [];
+      sub.hidden = !kids.length;
+      sub.innerHTML = kids.length
+        ? [{ slug: top.slug, name: 'All ' + top.name }, ...kids].map((c) =>
+            `<button class="chip small${c.slug === active ? ' active' : ''}" data-slug="${JW.esc(c.slug)}" aria-pressed="${c.slug === active}">${JW.esc(c.name)}</button>`).join('')
+        : '';
     }
 
     function draw() {
       const t = qEl.value.trim().toLowerCase();
-      let list = all.filter((p) => (!active || p.category === active) && (!t || (p.name + ' ' + p.description).toLowerCase().includes(t)));
+      const allowed = active ? slugsFor(active) : null;
+      let list = all.filter((p) => (!allowed || allowed.includes(p.category)) && (!t || (p.name + ' ' + p.description).toLowerCase().includes(t)));
       if (sortEl.value === 'low') list.sort((a, b) => JW.unitPrice(a) - JW.unitPrice(b));
       else if (sortEl.value === 'high') list.sort((a, b) => JW.unitPrice(b) - JW.unitPrice(a));
       else list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-      const cat = cats.find((c) => c.slug === active);
-      document.getElementById('title').textContent = cat ? cat.name : 'All products';
-      document.getElementById('crumb').textContent = cat ? cat.name : 'All products';
+      const cat = JW.bySlug(active, cats);
+      const parent = cat && cat.parent ? JW.bySlug(cat.parent, cats) : null;
+      const title = cat ? (parent ? parent.name + ' ' + cat.name : cat.name) : 'All products';
+      document.getElementById('title').textContent = title;
+      document.getElementById('crumb').innerHTML = cat
+        ? (parent ? `<a href="${JW.catUrl(parent.slug)}">${JW.esc(parent.name)}</a> / ` : '') + JW.esc(cat.name)
+        : 'All products';
       document.getElementById('subtitle').textContent = cat ? cat.description || '' : '';
-      document.title = (cat ? cat.name : 'All products') + ' | Janissary Wear';
+      document.title = title + ' | Janissary Wear';
 
       grid.innerHTML = list.length
         ? list.map((p) => JW.productCard(p, cats)).join('')
-        : `<div class="empty" style="grid-column:1/-1"><h3>${all.length ? 'Nothing matches that search' : 'No products yet'}</h3><p>${all.length ? 'Try another category or clear the search.' : 'New pieces will appear here as soon as they are added.'}</p></div>`;
+        : `<div class="empty" style="grid-column:1/-1"><h3>${all.length ? 'Nothing here yet' : 'No products yet'}</h3><p>${all.length ? 'Try another category or clear the search.' : 'New pieces will appear here as soon as they are added.'}</p></div>`;
     }
 
-    document.getElementById('chips').addEventListener('click', (e) => {
+    function pick(e) {
       const b = e.target.closest('.chip'); if (!b) return;
       active = b.dataset.slug;
       history.replaceState(null, '', active ? '?category=' + encodeURIComponent(active) : location.pathname);
+      JW.setActive(active);
       drawChips(); draw();
-    });
+    }
+    document.getElementById('chips').addEventListener('click', pick);
+    document.getElementById('subchips').addEventListener('click', pick);
     qEl.addEventListener('input', draw);
     sortEl.addEventListener('change', draw);
 
-    Promise.all([JW.api('categories'), JW.api('products')]).then(([c, p]) => {
+    Promise.all([JW.loadCats(), JW.api('products')]).then(([c, p]) => {
       cats = c; all = p; drawChips(); draw();
     }).catch((e) => {
       grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div>`;

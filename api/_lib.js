@@ -2,12 +2,26 @@
 // admin auth (HMAC signed token), small HTTP utilities.
 const crypto = require('crypto');
 
-const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// Vercel/Upstash may add a custom prefix to the variable names (e.g. STORAGE_KV_REST_API_URL),
+// so we accept any name that ends with one of the known names.
+function findEnv(re) {
+  const k = Object.keys(process.env).find((name) => re.test(name) && process.env[name]);
+  return k ? process.env[k] : undefined;
+}
+const REDIS_URL = findEnv(/(^|_)(KV_REST_API_URL|UPSTASH_REDIS_REST_URL)$/);
+const REDIS_TOKEN = findEnv(/(^|_)(KV_REST_API_TOKEN|UPSTASH_REDIS_REST_TOKEN)$/);
 const HAS_REDIS = !!(REDIS_URL && REDIS_TOKEN);
+const ON_VERCEL = !!process.env.VERCEL;
 
-// In-memory fallback (local dev only; NOT persistent on Vercel)
+// In-memory fallback: local dev only. On Vercel every request can run in a different
+// instance, so memory would silently lose data - we refuse to run without a database there.
 const mem = global.__JW_MEM__ || (global.__JW_MEM__ = new Map());
+
+function needDb() {
+  if (!HAS_REDIS && ON_VERCEL) {
+    throw new Error('Database is not connected. In Vercel open Storage, connect Upstash Redis to this project, then Redeploy.');
+  }
+}
 
 async function redis(cmd) {
   const r = await fetch(REDIS_URL, {
@@ -21,6 +35,7 @@ async function redis(cmd) {
 }
 
 async function dbGet(key, fallback = null) {
+  needDb();
   let raw;
   if (HAS_REDIS) raw = await redis(['GET', key]);
   else raw = mem.has(key) ? mem.get(key) : null;
@@ -29,12 +44,14 @@ async function dbGet(key, fallback = null) {
 }
 
 async function dbSet(key, value) {
+  needDb();
   const s = JSON.stringify(value);
   if (HAS_REDIS) await redis(['SET', key, s]);
   else mem.set(key, s);
 }
 
 async function dbDel(key) {
+  needDb();
   if (HAS_REDIS) await redis(['DEL', key]);
   else mem.delete(key);
 }
@@ -55,25 +72,49 @@ const DEFAULT_SETTINGS = {
   instagram: '',
 };
 
+// Two levels: main categories (parent = '') and sub-categories (parent = slug of a main category).
 const DEFAULT_CATEGORIES = [
-  { id: 'c_hoodies', name: 'Hoodies', slug: 'hoodies', image: '', description: 'Heavy fleece hoodies built for the season.' },
-  { id: 'c_tshirts', name: 'T-Shirts', slug: 't-shirts', image: '', description: 'Premium cotton tees with bold prints.' },
-  { id: 'c_jackets', name: 'Jackets', slug: 'jackets', image: '', description: 'Outerwear with a commanding silhouette.' },
-  { id: 'c_accessories', name: 'Accessories', slug: 'accessories', image: '', description: 'Caps, belts and finishing touches.' },
+  { id: 'c_men', name: 'Men', slug: 'men', parent: '', image: '', description: 'Streetwear for men.' },
+  { id: 'c_women', name: 'Women', slug: 'women', parent: '', image: '', description: 'Streetwear for women.' },
+  { id: 'c_men_tshirt', name: 'T-Shirt', slug: 'men-t-shirt', parent: 'men', image: '', description: '' },
+  { id: 'c_men_polo', name: 'Polo Shirt', slug: 'men-polo-shirt', parent: 'men', image: '', description: '' },
+  { id: 'c_men_drop', name: 'Drop Shoulder', slug: 'men-drop-shoulder', parent: 'men', image: '', description: '' },
+  { id: 'c_women_tshirt', name: 'T-Shirt', slug: 'women-t-shirt', parent: 'women', image: '', description: '' },
+  { id: 'c_women_drop', name: 'Drop Shoulder', slug: 'women-drop-shoulder', parent: 'women', image: '', description: '' },
 ];
+const LEGACY_DEFAULT_IDS = ['c_hoodies', 'c_tshirts', 'c_jackets', 'c_accessories'];
 
 async function getSettings() {
   const s = await dbGet('settings', null);
   return { ...DEFAULT_SETTINGS, ...(s || {}) };
 }
 
+// Loads categories. Creates the defaults on first run, and upgrades the old flat list
+// (version 1, no "parent" field) without losing anything the owner already added.
 async function getCategories() {
   let c = await dbGet('categories', null);
   if (!c) {
-    c = DEFAULT_CATEGORIES;
+    c = DEFAULT_CATEGORIES.map((x) => ({ ...x }));
+    await dbSet('categories', c);
+    return c;
+  }
+  if (c.some((x) => x.parent === undefined)) {
+    const products = await getProducts();
+    const used = new Set(products.map((p) => p.category));
+    // old untouched default categories with no products are dropped, everything else is kept
+    c = c.filter((x) => x.parent !== undefined || !(LEGACY_DEFAULT_IDS.includes(x.id) && !used.has(x.slug)));
+    c = c.map((x) => (x.parent === undefined ? { ...x, parent: '' } : x));
+    for (const d of DEFAULT_CATEGORIES) {
+      if (!c.some((x) => x.slug === d.slug)) c.push({ ...d });
+    }
     await dbSet('categories', c);
   }
   return c;
+}
+
+// slug of a category plus the slugs of all categories under it
+function withDescendants(cats, slug) {
+  return [slug, ...cats.filter((c) => c.parent === slug).map((c) => c.slug)];
 }
 
 async function getProducts() {
@@ -166,8 +207,8 @@ function clean(v, max = 200) {
 }
 
 module.exports = {
-  HAS_REDIS, dbGet, dbSet, dbDel,
-  getSettings, getCategories, getProducts, DEFAULT_SETTINGS,
+  HAS_REDIS, ON_VERCEL, redis, dbGet, dbSet, dbDel,
+  getSettings, getCategories, getProducts, withDescendants, DEFAULT_SETTINGS,
   send, getQuery, getBody,
   sign, verify, isAdmin, requireAdmin, safeEqual,
   uid, slugify, clean,
