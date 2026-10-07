@@ -103,19 +103,24 @@
       img.src = url;
     });
   }
+    // ---------- media library data ----------
+  const M = { items: [] };
+  async function loadMedia() { const r = await A('media'); M.items = r.items; }
+  const usedBy = (url) => S.products.filter((p) => (p.images || []).includes(url)).length + S.cats.filter((c) => c.image === url).length;
+  const fmtSize = (b) => (!b ? '' : b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB');
+
+  // upload a photo and also save it in the Media library
   async function uploadFile(file) {
     const dataUrl = await compress(file);
     const r = await A('image', { method: 'POST', body: { dataUrl } });
+    const rec = await A('media', { method: 'POST', body: { url: r.url, name: file.name, bytes: Math.round(dataUrl.length * 0.75) } });
+    M.items = [rec, ...M.items.filter((m) => m.id !== rec.id)];
     return r.url;
   }
-  function dropImages(urls) {
-    urls.filter((u) => u && u.startsWith('/api/image?id=')).forEach((u) => {
-      A('image?id=' + encodeURIComponent(u.split('id=')[1]), { method: 'DELETE' }).catch(() => {});
-    });
-  }
-
+  // photos now stay in the Media library, so nothing is deleted automatically
+  function dropImages() {}
   // ---------- router ----------
-  const VIEWS = { overview, products, categories, orders, settings };
+    const VIEWS = { overview, products, media, categories, orders, settings };
   function route() {
     const v = (location.hash || '#overview').slice(1);
     const name = VIEWS[v] ? v : 'overview';
@@ -351,7 +356,8 @@
           <div class="field"><span class="lbl">Photos</span>
             <div class="img-grid" id="imgGrid"></div>
             <div class="upload-row">
-              <label class="btn btn-ghost btn-sm" for="f-file" style="cursor:pointer">Upload photos</label>
+              <button class="btn btn-dark btn-sm" type="button" id="f-pick">Choose from Media</button>
+              <label class="btn btn-ghost btn-sm" for="f-file" style="cursor:pointer">Upload new</label>
               <input id="f-file" type="file" accept="image/jpeg,image/png,image/webp" multiple>
               <input class="input" id="f-url" placeholder="or paste an image link" style="flex:1;min-width:180px">
               <button class="btn btn-dark btn-sm" type="button" id="f-urlAdd">Add link</button>
@@ -396,6 +402,13 @@
         busy--; drawImgs();
       }
     });
+
+    $('#f-pick', dlg).addEventListener('click', () => {
+      const room = 8 - imgs.length;
+      if (room <= 0) { $('#pf-err', dlg).textContent = 'You can add up to 8 photos.'; return; }
+      openPicker({ multiple: true, max: room, onPick: (urls) => { urls.forEach((u) => { if (!imgs.includes(u) && imgs.length < 8) imgs.push(u); }); $('#pf-err', dlg).textContent = ''; drawImgs(); } });
+    });
+
     $('#f-urlAdd', dlg).addEventListener('click', () => {
       const v = $('#f-url', dlg).value.trim();
       if (!/^(https?:\/\/|\/)/.test(v)) { $('#pf-err', dlg).textContent = 'Please paste a full image link starting with https://'; return; }
@@ -445,6 +458,138 @@
 
   // close buttons inside any dialog
   dlg.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) dlg.close(); });
+
+    // ---------- media (photo library) ----------
+  async function media() {
+    view.innerHTML = '<div class="view-head"><div><h1>Media</h1><p>Loading photos...</p></div></div>';
+    try { await loadMedia(); } catch (e) { view.innerHTML = `<div class="empty"><h3>Could not load photos</h3><p>${esc(e.message)}</p></div>`; return; }
+    drawMedia();
+  }
+
+  function mediaCards() {
+    return M.items.map((m) => {
+      const n = usedBy(m.url);
+      return `<div class="m-card">
+        <div class="m-img"><img loading="lazy" src="${esc(m.url)}" alt=""></div>
+        <div class="m-meta"><div class="m-name" title="${esc(m.name)}">${esc(m.name)}</div>
+          <div class="muted">${esc(fmtSize(m.bytes)) || '&nbsp;'}</div>
+          <span class="badge ${n ? 'ok' : ''}">${n ? 'Used ' + n + (n > 1 ? ' times' : ' time') : 'Not used'}</span></div>
+        <div class="m-actions"><button class="btn btn-ghost btn-sm" data-act="copyMedia" data-id="${esc(m.id)}">Copy link</button>
+          <button class="btn btn-danger btn-sm" data-act="delMedia" data-id="${esc(m.id)}">Delete</button></div>
+      </div>`;
+    }).join('');
+  }
+
+  function drawMedia() {
+    view.innerHTML = `
+      <div class="view-head"><div><h1>Media</h1><p>${M.items.length} photo${M.items.length === 1 ? '' : 's'}. Upload once, then use a photo in any product or category.</p></div>
+        <div class="head-actions">
+          <button class="btn btn-ghost" type="button" data-act="backup">Download backup</button>
+          <label class="btn btn-primary" for="m-file" style="cursor:pointer">Upload photos</label>
+          <input id="m-file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        </div></div>
+      <div class="m-status warn">Photos are kept in the site database, which has limited free space. Download a backup now and then.</div>
+      <div class="m-prog" id="m-prog" role="status"></div>
+      <div id="m-drop">${M.items.length ? `<div class="media-grid" id="m-grid">${mediaCards()}</div>`
+        : `<div class="empty"><h3>No photos yet</h3><p>Upload your product photos here. You can also drop photos onto this page.</p><label class="btn btn-primary" for="m-file" style="cursor:pointer">Upload photos</label></div>`}</div>`;
+    $('#m-file').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; uploadMany(f, $('#m-prog'), drawMedia); });
+  }
+
+  // upload several photos one after the other and show progress in `box`
+  async function uploadMany(files, box, done, onEach) {
+    let ok = 0; const errs = [];
+    for (let i = 0; i < files.length; i++) {
+      box.textContent = `Uploading ${i + 1} of ${files.length}...`;
+      try { const url = await uploadFile(files[i]); ok++; if (onEach) onEach(url); } catch (ex) { errs.push(`${files[i].name}: ${ex.message}`); }
+    }
+    const msg = errs.length ? errs.join(' | ') : (ok ? `${ok} photo${ok === 1 ? '' : 's'} uploaded.` : '');
+    if (done) done();
+    const target = box.isConnected ? box : $('#m-prog');
+    if (target) { target.textContent = msg; target.classList.toggle('err', !!errs.length); }
+  }
+
+  actions.copyMedia = async (id) => {
+    const m = M.items.find((x) => x.id === id); if (!m) return;
+    const full = location.origin + m.url;
+    try { await navigator.clipboard.writeText(full); toast('Link copied'); } catch { prompt('Copy this link:', full); }
+  };
+  actions.delMedia = async (id) => {
+    const m = M.items.find((x) => x.id === id); if (!m) return;
+    const cover = S.cats.find((c) => c.image === m.url);
+    if (cover) { toast(`This photo is the cover of "${cover.name}". Change that category photo first.`, true); return; }
+    const n = usedBy(m.url);
+    if (!confirm(n ? `This photo is used in ${n} product${n > 1 ? 's' : ''}. If you delete it, it is removed from them too. Delete anyway?` : 'Delete this photo permanently?')) return;
+    try {
+      await A('media?id=' + encodeURIComponent(id), { method: 'DELETE' });
+      M.items = M.items.filter((x) => x.id !== id);
+      S.products = await A('products');
+      toast('Photo deleted'); drawMedia();
+    } catch (e) { toast(e.message, true); }
+  };
+  actions.backup = async () => {
+    try {
+      const data = await A('backup');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'janissary-wear-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      toast('Backup downloaded');
+    } catch (e) { toast(e.message, true); }
+  };
+
+  // drop photos anywhere on the Media page to upload them
+  view.addEventListener('dragover', (e) => { if ($('#m-drop') && e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  view.addEventListener('drop', (e) => {
+    if (!$('#m-drop') || !e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    uploadMany([...e.dataTransfer.files], $('#m-prog'), drawMedia);
+  });
+
+  // photo picker window used by the product and category forms
+  const picker = $('#picker');
+  picker.addEventListener('click', (e) => { if (e.target.closest('[data-pclose]')) picker.close(); });
+
+  async function openPicker({ multiple, max, onPick }) {
+    let sel = [];
+    picker.innerHTML = `
+      <div class="dlg-head"><h2>Choose from Media</h2><button class="dlg-x" type="button" data-pclose aria-label="Close">&times;</button></div>
+      <div class="dlg-body">
+        <div class="upload-row" style="margin-bottom:12px"><label class="btn btn-ghost btn-sm" for="pk-file" style="cursor:pointer">Upload new</label>
+          <input id="pk-file" type="file" accept="image/jpeg,image/png,image/webp" multiple><span class="muted" id="pk-msg"></span></div>
+        <div class="media-grid pick" id="pk-grid"><div class="muted">Loading...</div></div>
+      </div>
+      <div class="dlg-foot"><div class="form-error" id="pk-err" role="alert"></div>
+        <button class="btn btn-ghost" type="button" data-pclose>Cancel</button>
+        <button class="btn btn-primary" type="button" id="pk-ok" disabled>Use selected</button></div>`;
+    const grid = $('#pk-grid', picker), ok = $('#pk-ok', picker), err = $('#pk-err', picker);
+    function draw() {
+      grid.innerHTML = M.items.length ? M.items.map((m) => {
+        const i = sel.indexOf(m.url);
+        return `<button type="button" class="m-pick${i >= 0 ? ' sel' : ''}" data-url="${esc(m.url)}" aria-pressed="${i >= 0}" title="${esc(m.name)}"><img loading="lazy" src="${esc(m.url)}" alt="${esc(m.name)}">${i >= 0 ? `<span class="tick">${multiple ? i + 1 : '✓'}</span>` : ''}</button>`;
+      }).join('') : '<div class="muted">No photos yet. Use "Upload new" above.</div>';
+      ok.disabled = !sel.length;
+      ok.textContent = multiple && sel.length ? `Use ${sel.length} selected` : 'Use selected';
+    }
+    grid.addEventListener('click', (e) => {
+      const b = e.target.closest('.m-pick'); if (!b) return;
+      const u = b.dataset.url; err.textContent = '';
+      if (sel.includes(u)) sel = sel.filter((x) => x !== u);
+      else if (!multiple) sel = [u];
+      else if (sel.length >= max) { err.textContent = `You can pick up to ${max} photo${max === 1 ? '' : 's'} here.`; return; }
+      else sel.push(u);
+      draw();
+    });
+    $('#pk-file', picker).addEventListener('change', (e) => {
+      const f = [...e.target.files]; e.target.value = '';
+      uploadMany(f, $('#pk-msg', picker), draw, (url) => { if (!multiple) sel = [url]; else if (sel.length < max) sel.push(url); });
+    });
+    ok.addEventListener('click', () => { picker.close(); onPick(sel); });
+    picker.showModal();
+    try { await loadMedia(); } catch (e) { err.textContent = e.message; }
+    draw();
+  }
 
   // ---------- categories ----------
   function categories() {
@@ -505,7 +650,7 @@
           <div class="field"><label for="c-desc">Short description</label><input class="input" id="c-desc" value="${esc(d.description)}" maxlength="300" placeholder="Optional. Shown on the category page"></div>
           <div class="field"><span class="lbl">Cover photo</span>
             <div class="img-grid" id="cImg"></div>
-            <div class="upload-row"><label class="btn btn-ghost btn-sm" for="c-file" style="cursor:pointer">Upload photo</label><input id="c-file" type="file" accept="image/jpeg,image/png,image/webp"></div>
+            <div class="upload-row"><button class="btn btn-dark btn-sm" type="button" id="c-pick">Choose from Media</button><label class="btn btn-ghost btn-sm" for="c-file" style="cursor:pointer">Upload new</label><input id="c-file" type="file" accept="image/jpeg,image/png,image/webp"></div>
             <div class="hint">Optional. Main categories look best with a wide photo, sub-categories with a tall one.</div>
           </div>
         </div>
@@ -521,6 +666,9 @@
     }
     draw();
     box.addEventListener('click', (e) => { if (e.target.closest('.rm')) { img = ''; draw(); } });
+
+        $('#c-pick', dlg).addEventListener('click', () => openPicker({ multiple: false, max: 1, onPick: (urls) => { if (urls[0]) { img = urls[0]; draw(); } } }));
+
     $('#c-file', dlg).addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       busy = true; draw(); $('#cf-err', dlg).textContent = '';
