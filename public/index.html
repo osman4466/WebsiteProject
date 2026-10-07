@@ -68,7 +68,7 @@
     document.getElementById('cats').innerHTML = skel(2, '4/3');
     document.getElementById('new').innerHTML = skel(4, '4/5');
 
-    Promise.all([JW.loadCats(), JW.api('products?limit=8')]).then(([cats, products]) => {
+    Promise.all([JW.loadCats(), JW.api('products?sort=new&limit=8')]).then(([cats, products]) => {
       const tops = JW.tops(cats);
       document.getElementById('cats').innerHTML = tops.length
         ? tops.map((c) => JW.catTile(c)).join('')

@@ -28,6 +28,7 @@
           <input class="input" id="q" type="search" placeholder="Search products">
           <label class="sr-only" for="sort">Sort</label>
           <select class="select" id="sort">
+            <option value="order">Featured order</option>
             <option value="new">Newest</option>
             <option value="low">Price: low to high</option>
             <option value="high">Price: high to low</option>
@@ -78,7 +79,8 @@
       let list = all.filter((p) => (!allowed || allowed.includes(p.category)) && (!t || (p.name + ' ' + p.description).toLowerCase().includes(t)));
       if (sortEl.value === 'low') list.sort((a, b) => JW.unitPrice(a) - JW.unitPrice(b));
       else if (sortEl.value === 'high') list.sort((a, b) => JW.unitPrice(b) - JW.unitPrice(a));
-      else list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      else if (sortEl.value === 'new') list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      else if (sortEl.value === 'order') list.sort((a, b) => a.order - b.order);
 
       const cat = JW.bySlug(active, cats);
       const parent = cat && cat.parent ? JW.bySlug(cat.parent, cats) : null;

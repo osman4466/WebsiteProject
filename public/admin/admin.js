@@ -162,24 +162,153 @@
       ${!S.products.length ? `<div class="card"><h2>Add your first product</h2><p class="muted" style="margin-bottom:1rem">Your store is live but empty. Add products so customers can start ordering.</p><a class="btn btn-primary" href="#products">Go to products</a></div>` : ''}`;
   }
 
-  // ---------- products ----------
-  function products() {
-    view.innerHTML = `
-      <div class="view-head"><div><h1>Products</h1><p>${S.products.length} in your store</p></div>
-        <button class="btn btn-primary" data-act="newProduct">Add product</button></div>
-      ${S.products.length ? `<div class="table-wrap"><table class="t">
-        <thead><tr><th>Product</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Status</th><th></th></tr></thead>
-        <tbody>${S.products.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((p) => `
-          <tr>
-            <td><div class="t-name"><div class="t-thumb">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="">` : ''}</div><div>${esc(p.name)}${p.featured ? ' <span class="badge">Featured</span>' : ''}</div></div></td>
-            <td>${esc(catName(p.category))}</td>
-            <td class="num">${JW.onSale(p) ? `<b>${money(p.salePrice)}</b> <s class="muted">${money(p.price)}</s>` : money(p.price)}</td>
-            <td class="num">${p.stock <= 0 ? '<span class="badge off">Sold out</span>' : p.stock}</td>
-            <td><span class="badge ${p.active !== false ? 'ok' : 'off'}">${p.active !== false ? 'Visible' : 'Hidden'}</span></td>
-            <td><div class="t-actions"><button class="btn btn-ghost btn-sm" data-act="editProduct" data-id="${esc(p.id)}">Edit</button><button class="btn btn-danger btn-sm" data-act="delProduct" data-id="${esc(p.id)}">Delete</button></div></td>
-          </tr>`).join('')}</tbody></table></div>`
-        : `<div class="empty"><h3>No products yet</h3><p>Add your first product with photos, price and sizes.</p><button class="btn btn-primary" data-act="newProduct">Add product</button></div>`}`;
+  // ---------- products ----------  // ---------- products ----------
+  // view state: search, filters and sort (kept while you move around the admin)
+  const PV = { q: '', cat: '', status: '', sort: 'order', dir: 'asc' };
+  const slugsIn = (slug) => [slug, ...subCats(slug).map((c) => c.slug)];
+  const orderCmp = (a, b) => {
+    const ao = Number.isFinite(a.order), bo = Number.isFinite(b.order);
+    if (ao && bo && a.order !== b.order) return a.order - b.order;
+    if (ao !== bo) return ao ? 1 : -1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  };
+  const SORTS = {
+    order: orderCmp,
+    name: (a, b) => a.name.localeCompare(b.name),
+    category: (a, b) => catName(a.category).localeCompare(catName(b.category)) || a.name.localeCompare(b.name),
+    price: (a, b) => JW.unitPrice(a) - JW.unitPrice(b),
+    stock: (a, b) => a.stock - b.stock,
+    date: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+  };
+
+  function filteredProducts() {
+    const t = PV.q.trim().toLowerCase();
+    const slugs = PV.cat ? slugsIn(PV.cat) : null;
+    let list = S.products.filter((p) =>
+      (!slugs || slugs.includes(p.category)) &&
+      (!t || p.name.toLowerCase().includes(t)) &&
+      (!PV.status ||
+        (PV.status === 'visible' && p.active !== false) ||
+        (PV.status === 'hidden' && p.active === false) ||
+        (PV.status === 'soldout' && p.stock <= 0) ||
+        (PV.status === 'featured' && p.featured)));
+    list = list.slice().sort(SORTS[PV.sort] || orderCmp);
+    if (PV.sort !== 'order' && PV.dir === 'desc') list.reverse();
+    return list;
   }
+
+  function products() {
+    const sortable = (key, label, cls = '') => {
+      const on = PV.sort === key;
+      return `<th class="${cls}"><button type="button" class="th-sort${on ? ' on' : ''}" data-act="sortBy" data-id="${key}">${label}<span class="arrow">${on ? (PV.dir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`;
+    };
+    view.innerHTML = `
+      <div class="view-head"><div><h1>Products</h1><p id="pcount"></p></div>
+        <button class="btn btn-primary" data-act="newProduct">Add product</button></div>
+      ${S.products.length ? `
+      <div class="p-tools">
+        <input class="input" id="pv-q" type="search" placeholder="Search products" value="${esc(PV.q)}" aria-label="Search products">
+        <select class="select" id="pv-cat" aria-label="Filter by category"><option value="">All categories</option>${mainCats().map((t) => {
+          const kids = subCats(t.slug);
+          return `<option value="${esc(t.slug)}"${PV.cat === t.slug ? ' selected' : ''}>${esc(t.name)}${kids.length ? ' (all)' : ''}</option>` +
+            kids.map((k) => `<option value="${esc(k.slug)}"${PV.cat === k.slug ? ' selected' : ''}>&nbsp;&nbsp;&nbsp;${esc(k.name)}</option>`).join('');
+        }).join('')}</select>
+        <select class="select" id="pv-status" aria-label="Filter by status">
+          ${[['', 'All statuses'], ['visible', 'Visible'], ['hidden', 'Hidden'], ['soldout', 'Sold out'], ['featured', 'Featured']].map(([v, l]) => `<option value="${v}"${PV.status === v ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <select class="select" id="pv-sort" aria-label="Sort products">
+          ${[['order', 'Custom order (drag to arrange)'], ['date', 'Date added'], ['name', 'Name'], ['price', 'Price'], ['stock', 'Stock'], ['category', 'Category']].map(([v, l]) => `<option value="${v}"${PV.sort === v ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-sm" type="button" data-act="resetFilters">Reset</button>
+      </div>
+      <div class="p-note" id="pnote"></div>
+      <div class="table-wrap"><table class="t">
+        <thead><tr><th class="grip-col"></th>${sortable('name', 'Product')}${sortable('category', 'Category')}${sortable('price', 'Price', 'num')}${sortable('stock', 'Stock', 'num')}<th>Status</th>${sortable('date', 'Added')}<th></th></tr></thead>
+        <tbody id="pbody"></tbody></table></div>`
+        : `<div class="empty"><h3>No products yet</h3><p>Add your first product with photos, price and sizes.</p><button class="btn btn-primary" data-act="newProduct">Add product</button></div>`}`;
+    if (S.products.length) {
+      $('#pv-q').addEventListener('input', (e) => { PV.q = e.target.value; drawRows(); });
+      $('#pv-cat').addEventListener('change', (e) => { PV.cat = e.target.value; drawRows(); });
+      $('#pv-status').addEventListener('change', (e) => { PV.status = e.target.value; drawRows(); });
+      $('#pv-sort').addEventListener('change', (e) => { PV.sort = e.target.value; PV.dir = PV.sort === 'date' ? 'desc' : 'asc'; products(); });
+      drawRows();
+    }
+  }
+
+  // can the owner drag rows right now? Only in custom order, with nothing filtered out
+  const canDrag = () => PV.sort === 'order' && !PV.q.trim() && !PV.cat && !PV.status;
+
+  function drawRows() {
+    const list = filteredProducts();
+    const drag = canDrag();
+    $('#pcount').textContent = list.length === S.products.length ? `${S.products.length} in your store` : `Showing ${list.length} of ${S.products.length}`;
+    $('#pnote').textContent = PV.sort === 'order'
+      ? (drag ? 'Drag the ⋮⋮ handle (or use the arrows) to arrange products. This is the order customers see in the store.' : 'To rearrange products, clear the search and filters first.')
+      : 'Click a column title to sort. Choose "Custom order" to arrange products by hand.';
+    $('#pbody').innerHTML = list.length ? list.map((p, i) => `
+      <tr data-id="${esc(p.id)}"${drag ? ' draggable="true"' : ''}>
+        <td class="grip-col">${drag ? `<span class="grip" title="Drag to move">⋮⋮</span><span class="mv"><button type="button" data-act="moveUp" data-id="${esc(p.id)}" aria-label="Move up"${i === 0 ? ' disabled' : ''}>▲</button><button type="button" data-act="moveDown" data-id="${esc(p.id)}" aria-label="Move down"${i === list.length - 1 ? ' disabled' : ''}>▼</button></span>` : ''}</td>
+        <td><div class="t-name"><div class="t-thumb">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="">` : ''}</div><div>${esc(p.name)}${p.featured ? ' <span class="badge">Featured</span>' : ''}</div></div></td>
+        <td>${esc(catName(p.category))}</td>
+        <td class="num">${JW.onSale(p) ? `<b>${money(p.salePrice)}</b> <s class="muted">${money(p.price)}</s>` : money(p.price)}</td>
+        <td class="num">${p.stock <= 0 ? '<span class="badge off">Sold out</span>' : p.stock}</td>
+        <td><span class="badge ${p.active !== false ? 'ok' : 'off'}">${p.active !== false ? 'Visible' : 'Hidden'}</span></td>
+        <td class="muted">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+        <td><div class="t-actions"><button class="btn btn-ghost btn-sm" data-act="editProduct" data-id="${esc(p.id)}">Edit</button><button class="btn btn-danger btn-sm" data-act="delProduct" data-id="${esc(p.id)}">Delete</button></div></td>
+      </tr>`).join('') : `<tr><td colspan="8" class="muted" style="padding:1.6rem;text-align:center">No products match. Try another search or filter.</td></tr>`;
+  }
+
+  actions.sortBy = (key) => {
+    if (PV.sort === key) PV.dir = PV.dir === 'asc' ? 'desc' : 'asc';
+    else { PV.sort = key; PV.dir = key === 'date' ? 'desc' : 'asc'; }
+    products();
+  };
+  actions.resetFilters = () => { Object.assign(PV, { q: '', cat: '', status: '', sort: 'order', dir: 'asc' }); products(); };
+
+  // save a new arrangement: order numbers are updated locally, then sent to the server
+  async function saveOrder(ids) {
+    ids.forEach((id, i) => { const p = S.products.find((x) => x.id === id); if (p) p.order = i + 1; });
+    try { await A('products?reorder=1', { method: 'PUT', body: JSON.stringify({ ids }) }); toast('Order saved'); }
+    catch (e) { toast(e.message, true); S.products = await A('products').catch(() => S.products); }
+    drawRows();
+  }
+  const move = (id, d) => {
+    if (!canDrag()) return;
+    const ids = filteredProducts().map((p) => p.id);
+    const i = ids.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    saveOrder(ids);
+  };
+  actions.moveUp = (id) => move(id, -1);
+  actions.moveDown = (id) => move(id, 1);
+
+  // drag and drop rows
+  let dragId = null;
+  view.addEventListener('dragstart', (e) => {
+    const tr = e.target.closest && e.target.closest('#pbody tr[draggable]'); if (!tr) return;
+    dragId = tr.dataset.id; tr.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', dragId); } catch (x) {}
+  });
+  view.addEventListener('dragover', (e) => {
+    const tr = e.target.closest && e.target.closest('#pbody tr[draggable]'); if (!tr || !dragId) return;
+    e.preventDefault();
+    $$('#pbody tr').forEach((r) => r.classList.remove('drop-above', 'drop-below'));
+    if (tr.dataset.id === dragId) return;
+    const after = e.clientY > tr.getBoundingClientRect().top + tr.offsetHeight / 2;
+    tr.classList.add(after ? 'drop-below' : 'drop-above');
+  });
+  view.addEventListener('drop', (e) => {
+    const tr = e.target.closest && e.target.closest('#pbody tr[draggable]'); if (!tr || !dragId) return;
+    e.preventDefault();
+    const after = e.clientY > tr.getBoundingClientRect().top + tr.offsetHeight / 2;
+    const ids = filteredProducts().map((p) => p.id).filter((id) => id !== dragId);
+    let at = ids.indexOf(tr.dataset.id); if (after) at++;
+    ids.splice(at, 0, dragId);
+    dragId = null;
+    saveOrder(ids);
+  });
+  view.addEventListener('dragend', () => { dragId = null; $$('#pbody tr').forEach((r) => r.classList.remove('dragging', 'drop-above', 'drop-below')); });
 
   actions.newProduct = () => openProduct();
   actions.editProduct = (id) => openProduct(id);
