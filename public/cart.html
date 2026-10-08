@@ -138,7 +138,12 @@
         JW.cart.clear();
         root.innerHTML = `<div class="success">${JW.STAR('#0A0A0A', '#D8B35A')}<h1>Order placed</h1>
           <p>Your order number is <b>${JW.esc(r.number)}</b>.</p>
-          <p>Please keep ${JW.money(r.total)} ready for the delivery person.</p>
+          <div class="sum-box">
+            <div class="sum-line"><span>Products</span><span>${JW.money(r.subtotal)}</span></div>
+            <div class="sum-line"><span>Delivery</span><span>${r.shipping ? JW.money(r.shipping) : 'Free'}</span></div>
+            <div class="sum-total"><span>Total</span><span>${JW.money(r.total)}</span></div>
+          </div>
+          <p>Please keep <b>${JW.money(r.total)}</b> ready for the delivery person.</p>
           <a class="btn btn-dark" href="/products">Continue shopping</a></div>`;
         window.scrollTo({ top: 0 });
       } catch (ex) {

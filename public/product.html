@@ -19,7 +19,7 @@
 
   <script src="/js/app.js"></script>
   <script>
-        JW.renderChrome();
+    JW.renderChrome();
     const root = document.getElementById('root');
     const id = new URLSearchParams(location.search).get('id');
     let settings = {};
@@ -37,12 +37,14 @@
 
     function renderWA() {
       const p = window.__p;
-      const box = document.getElementById('wa');
+      const box = document.getElementById('waFloat');
       if (!box || !settings.whatsapp) return;
       const c = chosen();
       const opts = [c.size && 'Size ' + c.size, c.color].filter(Boolean).join(', ');
       const msg = encodeURIComponent(`Hello, I want to order: ${p.name}${opts ? ' (' + opts + ')' : ''} (${JW.money(JW.priceOf(p, c.size, c.color))}). ${location.href}`);
-      box.innerHTML = `<a class="btn btn-wa" href="https://wa.me/${JW.esc(settings.whatsapp)}?text=${msg}" target="_blank" rel="noopener">Ask on WhatsApp</a>`;
+      box.dataset.custom = '1';
+      box.href = `https://wa.me/${settings.whatsapp}?text=${msg}`;
+      box.hidden = false;
     }
 
     function optGroup(name, label, values) {
@@ -80,8 +82,8 @@
                 <input id="qty" type="number" min="1" max="20" value="1" aria-label="Quantity">
                 <button type="button" id="plus" aria-label="Increase quantity">+</button>
               </div>
-              <button class="btn btn-primary" id="add" style="flex:1;min-width:160px">Add to cart</button>
-              <span id="wa"></span>
+              <button class="btn btn-ghost" id="add" style="flex:1">Add to cart</button>
+              <button class="btn btn-primary" id="buy" style="flex:1">Buy now</button>
             </div>
             <div class="stock-note" id="stockNote"></div>
             <div class="facts">
@@ -92,6 +94,7 @@
           </div>
         </div>`;
 
+      document.body.classList.add('has-buy-bar');
       const qty = document.getElementById('qty');
       const maxQty = () => { const c = chosen(); return Math.min(20, Math.max(1, JW.stockOf(p, c.size, c.color))); };
       const clamp = () => { qty.max = maxQty(); qty.value = Math.max(1, Math.min(maxQty(), parseInt(qty.value) || 1)); };
@@ -125,6 +128,7 @@
         const add = document.getElementById('add');
         add.disabled = stock <= 0;
         add.textContent = stock <= 0 ? 'Sold out' : 'Add to cart';
+        document.getElementById('buy').disabled = stock <= 0;
         document.getElementById('stockNote').textContent = stock > 0 && stock <= 5 ? `Only ${stock} left` : '';
         clamp();
         renderWA();
@@ -137,6 +141,13 @@
         const { size, color } = chosen();
         JW.cart.add({ id: p.id, size, color, qty: parseInt(qty.value) });
         JW.toast('Added to your cart');
+      };
+
+      document.getElementById('buy').onclick = () => {
+        clamp();
+        const { size, color } = chosen();
+        JW.cart.add({ id: p.id, size, color, qty: parseInt(qty.value) });
+        location.href = '/cart';
       };
 
       const fill = (s) => {

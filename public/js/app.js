@@ -79,7 +79,7 @@
   const unitPrice = (p) => (p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price);
   const onSale = (p) => p.salePrice > 0 && p.salePrice < p.price;
 
-    // size + color options: each can have its own price, stock and photo
+  // size + color options: each can have its own price, stock and photo
   const hasVariants = (p) => Array.isArray(p.variants) && p.variants.length > 0;
   const variantOf = (p, size, color) => (p.variants || []).find((v) => (v.size || '') === (size || '') && (v.color || '') === (color || '')) || null;
   const stockOf = (p, size, color) => (hasVariants(p) ? (variantOf(p, size, color) || { stock: 0 }).stock : p.stock);
@@ -104,6 +104,18 @@
       <div class="price"><span class="now${onSale(p) ? ' sale' : ''}">${money(unitPrice(p))}</span>${onSale(p) ? `<s>${money(p.price)}</s>` : ''}</div>
     </a>`;
   }
+
+  // a row that scrolls sideways (swipe on phones, arrow buttons on bigger screens)
+  function carousel(products, cats) {
+    return `<div class="carousel"><button class="car-btn prev" type="button" aria-label="Previous" data-dir="-1">&#8249;</button>` +
+      `<div class="car-track">${products.map((p) => productCard(p, cats)).join('')}</div>` +
+      `<button class="car-btn next" type="button" aria-label="Next" data-dir="1">&#8250;</button></div>`;
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.car-btn'); if (!b) return;
+    const t = b.parentElement.querySelector('.car-track');
+    t.scrollBy({ left: Number(b.dataset.dir) * t.clientWidth * 0.85, behavior: 'smooth' });
+  });
 
   function catTile(c, large) {
     return `<a class="cat-tile" href="${catUrl(c.slug)}">
@@ -149,6 +161,18 @@
           `</div>`;
       }).join('') +
       `<a href="/products" data-key="products"${cls('products')}>All products</a>`;
+    const dn = $('#drawerNav');
+    if (dn) {
+      dn.innerHTML =
+        `<a href="/"${cls('home')}>Home</a>` +
+        tops().map((t) => {
+          const kids = kidsOf(t.slug);
+          return kids.length
+            ? `<details${t.slug === key ? ' open' : ''}><summary>${esc(t.name)}</summary><a href="${catUrl(t.slug)}">All ${esc(t.name)}</a>${kids.map((k) => `<a href="${catUrl(k.slug)}">${esc(k.name)}</a>`).join('')}</details>`
+            : `<a href="${catUrl(t.slug)}"${cls(t.slug)}>${esc(t.name)}</a>`;
+        }).join('') +
+        `<a href="/products"${cls('products')}>All products</a><a href="/cart">Your cart</a>`;
+    }
     const shop = $('#footShop');
     if (shop) {
       shop.innerHTML = tops().map((t) => `<li><a href="${catUrl(t.slug)}">${esc(t.name)}</a></li>`).join('') +
@@ -163,13 +187,32 @@
       top.innerHTML = `
       <div class="announce on-dark" id="announce" hidden></div>
       <header class="site-header"><div class="wrap">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="drawer"><span></span><span></span><span></span></button>
         <a class="brand" href="/" aria-label="Home">${STAR()}<span class="store-name">Janissary Wear</span></a>
         <nav class="nav" id="mainNav" aria-label="Main"></nav>
         <a class="cart-link" href="/cart" aria-label="Cart">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
           <span class="cart-count" data-n="0">0</span>
         </a>
-      </div></header>`;
+      </div></header>
+      <div class="drawer-bg" id="drawerBg" hidden></div>
+      <aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true">
+        <div class="drawer-head"><a class="brand" href="/">${STAR()}<span class="store-name">Janissary Wear</span></a><button class="drawer-x" id="drawerX" type="button" aria-label="Close menu">&times;</button></div>
+        <nav class="drawer-nav" id="drawerNav"></nav>
+        <div class="drawer-foot" id="drawerFoot"></div>
+      </aside>`;
+      const dr = $('#drawer'), bg = $('#drawerBg'), mb = $('#menuBtn');
+      const setDrawer = (open) => {
+        dr.classList.toggle('open', open); dr.setAttribute('aria-hidden', String(!open));
+        bg.hidden = !open; mb.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('no-scroll', open);
+      };
+      mb.addEventListener('click', () => setDrawer(true));
+      $('#drawerX').addEventListener('click', () => setDrawer(false));
+      bg.addEventListener('click', () => setDrawer(false));
+      dr.addEventListener('click', (e) => { if (e.target.closest('a')) setDrawer(false); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setDrawer(false); });
+      window.matchMedia('(min-width: 861px)').addEventListener('change', (m) => { if (m.matches) setDrawer(false); });
     }
     if (bottom) {
       bottom.innerHTML = `
@@ -182,6 +225,13 @@
         <div class="footer-bottom">© <span class="year"></span> <span class="store-name">Janissary Wear</span>. All rights reserved.</div>
       </div></footer>`;
       $('.year', bottom).textContent = new Date().getFullYear();
+    }
+    if (!$('#waFloat')) {
+      const w = document.createElement('a');
+      w.id = 'waFloat'; w.className = 'wa-float'; w.hidden = true;
+      w.target = '_blank'; w.rel = 'noopener'; w.setAttribute('aria-label', 'Chat on WhatsApp');
+      w.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16.04 3C8.84 3 3 8.8 3 15.95c0 2.29.6 4.52 1.74 6.48L3 29l6.76-1.7a13.1 13.1 0 0 0 6.28 1.6C23.2 28.9 29 23.1 29 15.95S23.2 3 16.04 3zm0 23.7c-1.95 0-3.86-.52-5.52-1.5l-.4-.23-4.01 1 1.07-3.9-.26-.4a10.6 10.6 0 0 1-1.63-5.7c0-5.86 4.8-10.6 10.75-10.6 5.9 0 10.7 4.74 10.7 10.6s-4.8 10.73-10.7 10.73zm5.9-7.9c-.32-.16-1.9-.93-2.2-1.04-.3-.1-.5-.16-.73.16-.2.32-.84 1.04-1.03 1.25-.19.22-.38.24-.7.08-.32-.16-1.36-.5-2.6-1.6-.95-.85-1.6-1.9-1.8-2.2-.18-.33-.02-.5.14-.66.15-.14.33-.38.5-.57.16-.19.2-.33.32-.55.1-.2.05-.4-.03-.56-.08-.16-.73-1.74-1-2.4-.26-.62-.53-.54-.73-.55h-.62c-.22 0-.57.08-.87.4-.3.33-1.14 1.1-1.14 2.7 0 1.58 1.17 3.13 1.33 3.35.16.2 2.3 3.5 5.57 4.9.78.33 1.38.53 1.86.68.78.25 1.5.2 2.06.12.63-.1 1.9-.78 2.17-1.53.27-.75.27-1.4.2-1.53-.08-.14-.3-.22-.62-.38z"/></svg>';
+      document.body.appendChild(w);
     }
     updateCartCount();
     drawNav();                       // instant, from the cached list if there is one
@@ -204,10 +254,17 @@
         if (s.instagram) rows.push(`<li><a href="${esc(s.instagram)}" target="_blank" rel="noopener">Instagram</a></li>`);
         fc.innerHTML = rows.join('') || '<li>Contact details coming soon</li>';
       }
+      const df = $('#drawerFoot');
+      if (df) df.innerHTML = [s.phone && `<a href="tel:${esc(s.phone)}">Call ${esc(s.phone)}</a>`, s.whatsapp && `<a href="https://wa.me/${esc(s.whatsapp)}" target="_blank" rel="noopener">WhatsApp us</a>`].filter(Boolean).join('');
+      const wf = $('#waFloat');
+      if (wf && s.whatsapp) {
+        if (!wf.dataset.custom) wf.href = 'https://wa.me/' + s.whatsapp + '?text=' + encodeURIComponent('Hello, I have a question about Janissary Wear.');
+        wf.hidden = false;
+      }
       document.dispatchEvent(new CustomEvent('jw:settings', { detail: s }));
     });
   }
 
-  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, hasVariants, variantOf, stockOf, priceOf, imageOf, imgTag, productCard, catTile, loadSettings, renderChrome, updateCartCount,
+  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, hasVariants, variantOf, stockOf, priceOf, imageOf, imgTag, productCard, carousel, catTile, loadSettings, renderChrome, updateCartCount,
     loadCats, tops, kidsOf, bySlug, topOf, catPath, catUrl, setActive };
 })();

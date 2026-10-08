@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
         const p = products.find((x) => x.id === it.id && x.active !== false);
         const qty = Math.max(1, Math.min(20, Math.floor(Number(it.qty) || 1)));
         if (!p) return send(res, 400, { error: 'A product in your cart is no longer available' });
-                const size = clean(it.size, 40), color = clean(it.color, 40);
+        const size = clean(it.size, 40), color = clean(it.color, 40);
         const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
         const v = hasVariants ? variantOf(p, size, color) : null;
         if (hasVariants && !v) return send(res, 400, { error: `This size or color of "${p.name}" is not available` });
@@ -55,14 +55,14 @@ module.exports = async (req, res) => {
         if (have < qty) return send(res, 400, { error: `Only ${have} left in stock for "${p.name}"${size || color ? ' (' + [size, color].filter(Boolean).join(', ') + ')' : ''}` });
         const unit = v && v.price > 0 ? v.price : p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price;
         items.push({ id: p.id, name: p.name, image: (p.colorImages || {})[color] || p.images[0] || '', size, color, qty, price: unit });
-           subtotal += unit * qty;
+        subtotal += unit * qty;
       }
 
       const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
       const shipping = free ? 0 : customer.area === 'outside' ? settings.shippingOutside : settings.shippingInside;
 
       // reduce stock
-            for (const it of items) {
+      for (const it of items) {
         changeStock(products.find((x) => x.id === it.id), it.size, it.color, -it.qty);
       }
       await dbSet('products', products);
@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
       };
       orders.unshift(order);
       await dbSet('orders', orders.slice(0, 2000));
-      return send(res, 201, { number: order.number, total: order.total });
+      return send(res, 201, { number: order.number, subtotal, shipping, total: order.total });
     }
 
     // ---- Admin only below ----

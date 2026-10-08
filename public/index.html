@@ -31,24 +31,16 @@
       </div>
     </section>
 
-    <section class="section" aria-labelledby="cat-h">
+    <div id="sections"></div>
+
+    <section class="section cat-strip" aria-labelledby="cat-h">
       <div class="wrap">
         <div class="section-head">
           <div><h2 id="cat-h">Shop by category</h2></div>
           <a class="link-more" href="/categories">All categories</a>
         </div>
         <div class="hero-tiles" id="cats"></div>
-        <div class="style-rows" id="styles" style="margin-top:2rem"></div>
-      </div>
-    </section>
-
-    <section class="section" style="padding-top:0" aria-labelledby="new-h">
-      <div class="wrap">
-        <div class="section-head">
-          <div><h2 id="new-h">New arrivals</h2></div>
-          <a class="link-more" href="/products">All products</a>
-        </div>
-        <div class="product-grid" id="new"></div>
+        <div class="style-rows" id="styles" style="margin-top:1.4rem"></div>
       </div>
     </section>
 
@@ -64,26 +56,27 @@
     JW.renderChrome('home');
     document.querySelector('.standard').insertAdjacentHTML('afterbegin', JW.STAR('#FAFAF7', '#B08A3A'));
 
-    const skel = (n, r) => Array.from({ length: n }, () => `<div class="skeleton" style="aspect-ratio:${r}"></div>`).join('');
-    document.getElementById('cats').innerHTML = skel(2, '4/3');
-    document.getElementById('new').innerHTML = skel(4, '4/5');
+    const sectionsBox = document.getElementById('sections');
+    sectionsBox.innerHTML = '<div class="wrap home-sec"><div class="car-track">' +
+      Array.from({ length: 4 }, () => '<div class="skeleton" style="flex:0 0 44vw;max-width:240px;aspect-ratio:4/5"></div>').join('') + '</div></div>';
+    document.getElementById('cats').innerHTML = Array.from({ length: 2 }, () => '<div class="skeleton" style="aspect-ratio:4/3"></div>').join('');
 
-    Promise.all([JW.loadCats(), JW.api('products?sort=new&limit=8')]).then(([cats, products]) => {
+    // sections come from Admin > Homepage (carousels and grids, in the order you set)
+    Promise.all([JW.loadCats(), JW.api('home')]).then(([cats, home]) => {
+      sectionsBox.innerHTML = home.sections.length
+        ? home.sections.map((s) => `
+          <section class="home-sec" aria-label="${JW.esc(s.title)}"><div class="wrap">
+            <div class="section-head"><h2>${JW.esc(s.title)}</h2><a class="link-more" href="${JW.esc(s.link)}">View all</a></div>
+            ${s.type === 'grid' ? `<div class="product-grid">${s.products.map((p) => JW.productCard(p, cats)).join('')}</div>` : JW.carousel(s.products, cats)}
+          </div></section>`).join('')
+        : '<div class="wrap home-sec"><div class="empty"><h3>The first drop is being prepared</h3><p>New pieces will appear here as soon as they are added.</p></div></div>';
+
       const tops = JW.tops(cats);
-      document.getElementById('cats').innerHTML = tops.length
-        ? tops.map((c) => JW.catTile(c)).join('')
-        : '<div class="empty" style="grid-column:1/-1"><h3>Categories are on the way</h3><p>Check back soon.</p></div>';
-
-      // one row per main category with its styles (T-Shirt, Polo Shirt ...)
+      document.getElementById('cats').innerHTML = tops.length ? tops.map((c) => JW.catTile(c)).join('') : '';
       document.getElementById('styles').innerHTML = tops.filter((t) => JW.kidsOf(t.slug, cats).length).map((t) =>
         `<div class="style-row"><h3>${JW.esc(t.name)}</h3>${JW.kidsOf(t.slug, cats).map((k) => `<a class="chip" href="${JW.catUrl(k.slug)}">${JW.esc(k.name)}</a>`).join('')}</div>`).join('');
-
-      const box = document.getElementById('new');
-      box.innerHTML = products.length
-        ? products.map((p) => JW.productCard(p, cats)).join('')
-        : '<div class="empty" style="grid-column:1/-1"><h3>The first drop is being prepared</h3><p>New pieces will appear here as soon as they are added.</p></div>';
     }).catch((e) => {
-      document.getElementById('new').innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div>`;
+      sectionsBox.innerHTML = `<div class="wrap home-sec"><div class="empty"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div></div>`;
       document.getElementById('cats').innerHTML = '';
     });
 

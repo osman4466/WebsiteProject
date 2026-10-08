@@ -103,7 +103,7 @@
       img.src = url;
     });
   }
-    // ---------- media library data ----------
+  // ---------- media library data ----------
   const M = { items: [] };
   async function loadMedia() { const r = await A('media'); M.items = r.items; }
   const usedBy = (url) => S.products.filter((p) => (p.images || []).includes(url)).length + S.cats.filter((c) => c.image === url).length;
@@ -119,8 +119,9 @@
   }
   // photos now stay in the Media library, so nothing is deleted automatically
   function dropImages() {}
+
   // ---------- router ----------
-    const VIEWS = { overview, products, media, categories, orders, settings };
+  const VIEWS = { overview, products, homepage, media, categories, orders, settings };
   function route() {
     const v = (location.hash || '#overview').slice(1);
     const name = VIEWS[v] ? v : 'overview';
@@ -167,7 +168,7 @@
       ${!S.products.length ? `<div class="card"><h2>Add your first product</h2><p class="muted" style="margin-bottom:1rem">Your store is live but empty. Add products so customers can start ordering.</p><a class="btn btn-primary" href="#products">Go to products</a></div>` : ''}`;
   }
 
-  // ---------- products ----------  // ---------- products ----------
+  // ---------- products ----------
   // view state: search, filters and sort (kept while you move around the admin)
   const PV = { q: '', cat: '', status: '', sort: 'order', dir: 'asc' };
   const slugsIn = (slug) => [slug, ...subCats(slug).map((c) => c.slug)];
@@ -270,7 +271,7 @@
   };
   actions.resetFilters = () => { Object.assign(PV, { q: '', cat: '', status: '', sort: 'order', dir: 'asc' }); products(); };
 
-  // save a new arrangement: order numbers are updated locally, then sent to the server
+  // save a new arrangement: S.products order numbers are updated locally, then sent to the server
   async function saveOrder(ids) {
     ids.forEach((id, i) => { const p = S.products.find((x) => x.id === id); if (p) p.order = i + 1; });
     try { await A('products?reorder=1', { method: 'PUT', body: JSON.stringify({ ids }) }); toast('Order saved'); }
@@ -322,7 +323,6 @@
     if (!p || !confirm(`Delete "${p.name}"? This cannot be undone.`)) return;
     try {
       await A('products?id=' + encodeURIComponent(id), { method: 'DELETE' });
-      dropImages(p.images);
       S.products = S.products.filter((x) => x.id !== id);
       toast('Product deleted'); products();
     } catch (e) { toast(e.message, true); }
@@ -333,8 +333,7 @@
     const p = id ? S.products.find((x) => x.id === id) : null;
     const d = p || { name: '', description: '', price: '', salePrice: '', category: (S.cats.find((c) => c.parent) || S.cats[0]).slug, images: [], sizes: [], colors: [], stock: 10, featured: false, active: true };
     let imgs = [...d.images]; const original = [...d.images]; const uploaded = []; let saved = false; let busy = 0;
-
-        const cimg = { ...(d.colorImages || {}) };
+    const cimg = { ...(d.colorImages || {}) };
     const vstore = {};
     (d.variants || []).forEach((v) => { vstore[v.size + '|' + v.color] = { price: v.price || '', stock: v.stock }; });
 
@@ -355,15 +354,13 @@
             <div class="field"><label for="f-sizes">Sizes</label><input class="input" id="f-sizes" value="${esc((d.sizes || []).join(', '))}" placeholder="S, M, L, XL"><div class="hint">Separate with commas. Leave empty if it has no sizes.</div></div>
             <div class="field"><label for="f-colors">Colors</label><input class="input" id="f-colors" value="${esc((d.colors || []).join(', '))}" placeholder="Black, Navy"><div class="hint">Separate with commas. Optional.</div></div>
           </div>
-
-                    <div class="field" id="colorBox" hidden><span class="lbl">Photo for each color</span>
+          <div class="field" id="colorBox" hidden><span class="lbl">Photo for each color</span>
             <div id="colorRows"></div>
             <div class="hint">When a customer picks a color, the store shows that color's photo.</div></div>
           <div class="field" id="varBox" hidden>
             <label class="check"><input type="checkbox" id="f-usevar"${(d.variants || []).length ? ' checked' : ''}> Different price and stock for each size and color</label>
             <div id="varTable" style="margin-top:.6rem"></div>
             <div class="hint">Leave a price empty to use the product price. Total stock is counted automatically.</div></div>
-
           <div class="field"><label for="f-desc">Description</label><textarea class="textarea" id="f-desc" rows="4" maxlength="3000">${esc(d.description)}</textarea></div>
 
           <div class="field"><span class="lbl">Photos</span>
@@ -415,8 +412,7 @@
         busy--; drawImgs();
       }
     });
-
-        // ----- photo for each color, and price + stock for each size and color -----
+    // ----- photo for each color, and price + stock for each size and color -----
     const csv = (sel) => [...new Set($(sel, dlg).value.split(',').map((x) => x.trim()).filter(Boolean))].slice(0, 20);
     const combos = () => {
       const s = csv('#f-sizes'), c = csv('#f-colors');
@@ -477,13 +473,12 @@
     ['#f-sizes', '#f-colors'].forEach((sel) => $(sel, dlg).addEventListener('input', () => { drawColors(); drawVars(); }));
     $('#f-usevar', dlg).addEventListener('change', drawVars);
     drawColors(); drawVars();
-    
+
     $('#f-pick', dlg).addEventListener('click', () => {
       const room = 8 - imgs.length;
       if (room <= 0) { $('#pf-err', dlg).textContent = 'You can add up to 8 photos.'; return; }
       openPicker({ multiple: true, max: room, onPick: (urls) => { urls.forEach((u) => { if (!imgs.includes(u) && imgs.length < 8) imgs.push(u); }); $('#pf-err', dlg).textContent = ''; drawImgs(); } });
     });
-
     $('#f-urlAdd', dlg).addEventListener('click', () => {
       const v = $('#f-url', dlg).value.trim();
       if (!/^(https?:\/\/|\/)/.test(v)) { $('#pf-err', dlg).textContent = 'Please paste a full image link starting with https://'; return; }
@@ -504,7 +499,7 @@
         colors: $('#f-colors', dlg).value,
         description: $('#f-desc', dlg).value.trim(),
         images: imgs,
-                colorImages: Object.fromEntries(csv('#f-colors').filter((c) => cimg[c]).map((c) => [c, cimg[c]])),
+        colorImages: Object.fromEntries(csv('#f-colors').filter((c) => cimg[c]).map((c) => [c, cimg[c]])),
         variants: useVars() ? combos().map((cb) => { const r = rowOf(cb); return { size: cb.size, color: cb.color, price: Number(r.price) || 0, stock: Math.max(0, Math.floor(Number(r.stock) || 0)) }; }) : [],
         featured: $('#f-featured', dlg).checked,
         active: $('#f-active', dlg).checked,
@@ -518,8 +513,6 @@
       try {
         if (p) await A('products?id=' + encodeURIComponent(p.id), { method: 'PUT', body });
         else await A('products', { method: 'POST', body });
-        saved = true;
-        dropImages([...original, ...uploaded].filter((u) => !imgs.includes(u)));
         S.products = await A('products');
         dlg.close();
         toast(p ? 'Product updated' : 'Product added');
@@ -529,14 +522,13 @@
       }
     });
 
-    dlg.onclose = () => { if (!saved) dropImages(uploaded); dlg.onclose = null; };
     dlg.showModal();
   }
 
   // close buttons inside any dialog
   dlg.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) dlg.close(); });
 
-    // ---------- media (photo library) ----------
+  // ---------- media (photo library) ----------
   async function media() {
     view.innerHTML = '<div class="view-head"><div><h1>Media</h1><p>Loading photos...</p></div></div>';
     try { await loadMedia(); } catch (e) { view.innerHTML = `<div class="empty"><h3>Could not load photos</h3><p>${esc(e.message)}</p></div>`; return; }
@@ -702,7 +694,6 @@
     if (!c || !confirm(`Delete the category "${c.name}"?`)) return;
     try {
       await A('categories?id=' + encodeURIComponent(id), { method: 'DELETE' });
-      dropImages([c.image]);
       S.cats = S.cats.filter((x) => x.id !== id);
       toast('Category deleted'); categories();
     } catch (e) { toast(e.message, true); }
@@ -743,9 +734,7 @@
     }
     draw();
     box.addEventListener('click', (e) => { if (e.target.closest('.rm')) { img = ''; draw(); } });
-
-        $('#c-pick', dlg).addEventListener('click', () => openPicker({ multiple: false, max: 1, onPick: (urls) => { if (urls[0]) { img = urls[0]; draw(); } } }));
-
+    $('#c-pick', dlg).addEventListener('click', () => openPicker({ multiple: false, max: 1, onPick: (urls) => { if (urls[0]) { img = urls[0]; draw(); } } }));
     $('#c-file', dlg).addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       busy = true; draw(); $('#cf-err', dlg).textContent = '';
@@ -764,21 +753,21 @@
       try {
         if (c) await A('categories?id=' + encodeURIComponent(c.id), { method: 'PUT', body });
         else await A('categories', { method: 'POST', body });
-        saved = true;
-        dropImages([original, ...uploaded].filter((u) => u && u !== img));
         S.cats = await A('categories');
         dlg.close(); toast(c ? 'Category updated' : 'Category added');
         if ((location.hash || '#overview') === '#categories') categories(); else route();
       } catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = c ? 'Save changes' : 'Add category'; }
     });
 
-    dlg.onclose = () => { if (!saved) dropImages(uploaded); dlg.onclose = null; };
     dlg.showModal();
   }
 
   // ---------- orders ----------
   let orderFilter = 'all';
   const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+
+  const ordSub = (o) => (o.items || []).reduce((n, i) => n + i.price * i.qty, 0);
+  const ordTotal = (o) => ordSub(o) + (Number(o.shipping) || 0);
 
   function orders() {
     const list = S.orders.filter((o) => orderFilter === 'all' || o.status === orderFilter);
@@ -788,12 +777,13 @@
         <select class="select" id="of"><option value="all">All orders</option>${STATUSES.map((s) => `<option value="${s}"${s === orderFilter ? ' selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}</select></div></div>
       ${list.length ? list.map((o) => `
         <details class="order">
-          <summary><b>${esc(o.number)}</b><span>${esc(o.customer.name)} <span class="muted">${fmtDate(o.createdAt)}</span></span><b>${money(o.total)}</b><span class="badge ${o.status}">${o.status}</span></summary>
+          <summary><b>${esc(o.number)}</b><span>${esc(o.customer.name)} <span class="muted">${fmtDate(o.createdAt)}</span></span><b>${money(ordTotal(o))}</b><span class="badge ${o.status}">${o.status}</span></summary>
           <div class="order-body">
             <div class="order-items">
               ${o.items.map((i) => `<div><span>${esc(i.name)}${i.size ? ' / ' + esc(i.size) : ''}${i.color ? ' / ' + esc(i.color) : ''} x ${i.qty}</span><span>${money(i.price * i.qty)}</span></div>`).join('')}
+              <div><span>Subtotal (products)</span><span>${money(ordSub(o))}</span></div>
               <div><span>Delivery (${o.customer.area === 'outside' ? 'outside Dhaka' : 'inside Dhaka'})</span><span>${money(o.shipping)}</span></div>
-              <div><b>Total, cash on delivery</b><b>${money(o.total)}</b></div>
+              <div><b>Total, cash on delivery</b><b>${money(ordTotal(o))}</b></div>
             </div>
             <div>
               <p><b>${esc(o.customer.name)}</b></p>
@@ -836,6 +826,104 @@
     } catch (e) { toast(e.message, true); }
   };
 
+  // ---------- homepage sections ----------
+  const H = { sections: [], loaded: false };
+  const SRC = { manual: 'Products I pick by hand', newest: 'Newest products', featured: 'Featured products', sale: 'Products on sale', category: 'One category', all: 'All products (in my custom order)' };
+  const newSection = () => ({ id: 'h_' + Math.random().toString(36).slice(2, 9), title: 'New section', type: 'carousel', source: 'newest', category: '', productIds: [], limit: 10, visible: true });
+
+  async function homepage() {
+    view.innerHTML = '<div class="view-head"><div><h1>Homepage</h1></div></div><p class="muted">Loading...</p>';
+    try { H.sections = (await A('home?raw=1')).sections; H.loaded = true; } catch (e) { view.innerHTML = `<div class="card"><p class="form-error">${esc(e.message)}</p></div>`; return; }
+    drawHome();
+  }
+
+  function drawHome() {
+    const y = window.scrollY;
+    view.innerHTML = `
+      <div class="view-head"><div><h1>Homepage</h1><p>Choose what customers see on the front page, from top to bottom. A <b>carousel</b> slides sideways, a <b>grid</b> shows products in rows.</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" data-act="hAdd">Add section</button><button class="btn btn-primary" id="h-save" data-act="hSave">Save homepage</button></div></div>
+      ${H.sections.length ? H.sections.map((s, i) => `
+        <div class="card hs-card${s.visible ? '' : ' off'}">
+          <div class="hs-top">
+            <span class="hs-n">${i + 1}</span>
+            <input class="input hs-title" data-i="${i}" data-hf="title" value="${esc(s.title)}" placeholder="Section title" aria-label="Section title">
+            <select class="select" data-i="${i}" data-hf="type" aria-label="Layout"><option value="carousel"${s.type === 'carousel' ? ' selected' : ''}>Carousel</option><option value="grid"${s.type === 'grid' ? ' selected' : ''}>Grid</option></select>
+          </div>
+          <div class="hs-row">
+            <div class="field"><label>Products shown</label>
+              <select class="select" data-i="${i}" data-hf="source">${Object.keys(SRC).map((k) => `<option value="${k}"${s.source === k ? ' selected' : ''}>${SRC[k]}</option>`).join('')}</select></div>
+            ${s.source === 'category' ? `<div class="field"><label>Category</label><select class="select" data-i="${i}" data-hf="category"><option value="">Choose...</option>${catOptions(s.category)}</select></div>` : ''}
+            ${s.source !== 'manual' ? `<div class="field hs-count"><label>How many</label><input class="input" type="number" min="1" max="60" data-i="${i}" data-hf="limit" value="${s.limit}"></div>` : ''}
+          </div>
+          ${s.source === 'manual' ? `<div class="hs-picked">${s.productIds.length
+            ? s.productIds.map((id) => { const p = S.products.find((x) => x.id === id); return p ? `<span class="hs-chip">${esc(p.name)}<button type="button" data-act="hDrop" data-id="${i}:${esc(id)}" aria-label="Remove ${esc(p.name)}">&times;</button></span>` : ''; }).join('')
+            : '<span class="muted">No products chosen yet.</span>'}
+            <button class="btn btn-ghost btn-sm" type="button" data-act="hPick" data-id="${i}">Choose products</button></div>` : ''}
+          <div class="hs-foot">
+            <label class="hs-vis"><input type="checkbox" data-i="${i}" data-hf="visible"${s.visible ? ' checked' : ''}> Show on homepage</label>
+            <span class="hs-btns">
+              <button class="btn btn-ghost btn-sm" data-act="hUp" data-id="${i}"${i === 0 ? ' disabled' : ''} aria-label="Move up">&uarr; Up</button>
+              <button class="btn btn-ghost btn-sm" data-act="hDown" data-id="${i}"${i === H.sections.length - 1 ? ' disabled' : ''} aria-label="Move down">&darr; Down</button>
+              <button class="btn btn-danger btn-sm" data-act="hDel" data-id="${i}">Delete</button>
+            </span>
+          </div>
+        </div>`).join('') : '<div class="card"><p class="muted">No sections yet. Customers will see an empty front page. Add a section to start.</p></div>'}
+      <div class="form-error" id="h-err" role="alert"></div>`;
+    window.scrollTo(0, y);
+  }
+
+  const hChange = (e) => {
+    const t = e.target, f = t.dataset && t.dataset.hf; if (!f) return;
+    const s = H.sections[Number(t.dataset.i)]; if (!s) return;
+    if (f === 'visible') s.visible = t.checked;
+    else if (f === 'limit') s.limit = Math.max(1, Math.min(60, Math.floor(Number(t.value)) || 10));
+    else s[f] = t.value;
+    if (e.type === 'change' && (f === 'source' || f === 'type' || f === 'visible')) drawHome();
+  };
+  view.addEventListener('input', hChange);
+  view.addEventListener('change', hChange);
+
+  actions.hAdd = () => { H.sections.push(newSection()); drawHome(); window.scrollTo(0, document.body.scrollHeight); };
+  actions.hDel = (i) => { if (confirm('Delete this section? Products themselves are not deleted.')) { H.sections.splice(Number(i), 1); drawHome(); } };
+  const hMove = (i, d) => { i = Number(i); const j = i + d; if (j < 0 || j >= H.sections.length) return; [H.sections[i], H.sections[j]] = [H.sections[j], H.sections[i]]; drawHome(); };
+  actions.hUp = (i) => hMove(i, -1);
+  actions.hDown = (i) => hMove(i, 1);
+  actions.hDrop = (v) => { const [i, id] = v.split(':'); const s = H.sections[Number(i)]; s.productIds = s.productIds.filter((x) => x !== id); drawHome(); };
+
+  actions.hSave = async (_, btn) => {
+    const err = $('#h-err'); err.textContent = '';
+    const bad = H.sections.findIndex((s) => !s.title.trim());
+    if (bad >= 0) { err.textContent = `Section ${bad + 1} needs a title.`; return; }
+    const noCat = H.sections.findIndex((s) => s.source === 'category' && !s.category);
+    if (noCat >= 0) { err.textContent = `Section ${noCat + 1}: please choose a category.`; return; }
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try { H.sections = (await A('home', { method: 'PUT', body: { sections: H.sections } })).sections; toast('Homepage saved'); drawHome(); }
+    catch (ex) { err.textContent = ex.message; btn.disabled = false; btn.textContent = 'Save homepage'; }
+  };
+
+  // choose products for a hand-picked section
+  actions.hPick = (i) => {
+    const s = H.sections[Number(i)]; let sel = s.productIds.slice(), q = '';
+    picker.innerHTML = `
+      <div class="dlg-head"><h2>Choose products</h2><button class="dlg-x" type="button" data-pclose aria-label="Close">&times;</button></div>
+      <div class="dlg-body"><input class="input" id="hp-q" type="search" placeholder="Search products" style="margin-bottom:10px"><div class="pick-list" id="hp-list"></div></div>
+      <div class="dlg-foot"><span class="muted" id="hp-n"></span><button class="btn btn-ghost" type="button" data-pclose>Cancel</button><button class="btn btn-primary" type="button" id="hp-ok">Use selected</button></div>`;
+    const list = $('#hp-list', picker);
+    const draw = () => {
+      const t = q.trim().toLowerCase();
+      const rows = S.products.filter((p) => !t || p.name.toLowerCase().includes(t));
+      list.innerHTML = rows.length ? rows.map((p) => {
+        const n = sel.indexOf(p.id);
+        return `<label class="pick-row"><input type="checkbox" data-id="${esc(p.id)}"${n >= 0 ? ' checked' : ''}>${p.images[0] ? `<img src="${esc(p.images[0])}" alt="">` : '<span class="ph-sq"></span>'}<span class="pk-name">${esc(p.name)}<small>${esc(catName(p.category))}${p.active === false ? ' · hidden' : ''}</small></span>${n >= 0 ? `<b class="pk-n">${n + 1}</b>` : ''}</label>`;
+      }).join('') : '<p class="muted">No products found.</p>';
+      $('#hp-n', picker).textContent = sel.length + ' selected';
+    };
+    list.addEventListener('change', (e) => { const id = e.target.dataset.id; if (!id) return; sel = e.target.checked ? [...sel, id] : sel.filter((x) => x !== id); draw(); });
+    $('#hp-q', picker).addEventListener('input', (e) => { q = e.target.value; draw(); });
+    $('#hp-ok', picker).addEventListener('click', () => { s.productIds = sel; picker.close(); drawHome(); });
+    draw(); picker.showModal();
+  };
+
   // ---------- settings ----------
   function settings() {
     const s = S.settings;
@@ -848,7 +936,7 @@
         ${f('announcement', 'Top banner message', s.announcement, 'placeholder="Leave empty to hide the banner"')}
         <h2 style="margin-top:1.4rem">Contact</h2>
         <div class="row2">${f('phone', 'Phone number', s.phone, 'placeholder="01XXXXXXXXX"')}${f('whatsapp', 'WhatsApp number', s.whatsapp, 'placeholder="8801XXXXXXXXX"')}</div>
-        <div class="hint" style="margin:-.6rem 0 1rem">Use the full international number for WhatsApp, for example 8801712345678. The Ask on WhatsApp button appears on products when this is filled.</div>
+        <div class="hint" style="margin:-.6rem 0 1rem">Use the full international number for WhatsApp, for example 8801712345678. The round WhatsApp icon appears on every page when this is filled.</div>
         <div class="row2">${f('email', 'Email', s.email)}${f('address', 'Address', s.address)}</div>
         <div class="row2">${f('facebook', 'Facebook page link', s.facebook, 'placeholder="https://facebook.com/..."')}${f('instagram', 'Instagram link', s.instagram, 'placeholder="https://instagram.com/..."')}</div>
         <h2 style="margin-top:1.4rem">Delivery charges (৳)</h2>
