@@ -334,6 +334,10 @@
     const d = p || { name: '', description: '', price: '', salePrice: '', category: (S.cats.find((c) => c.parent) || S.cats[0]).slug, images: [], sizes: [], colors: [], stock: 10, featured: false, active: true };
     let imgs = [...d.images]; const original = [...d.images]; const uploaded = []; let saved = false; let busy = 0;
 
+        const cimg = { ...(d.colorImages || {}) };
+    const vstore = {};
+    (d.variants || []).forEach((v) => { vstore[v.size + '|' + v.color] = { price: v.price || '', stock: v.stock }; });
+
     dlg.innerHTML = `
       <div class="dlg-head"><h2>${p ? 'Edit product' : 'Add product'}</h2><button class="dlg-x" type="button" data-close aria-label="Close">&times;</button></div>
       <form id="pf" novalidate style="display:contents">
@@ -351,6 +355,15 @@
             <div class="field"><label for="f-sizes">Sizes</label><input class="input" id="f-sizes" value="${esc((d.sizes || []).join(', '))}" placeholder="S, M, L, XL"><div class="hint">Separate with commas. Leave empty if it has no sizes.</div></div>
             <div class="field"><label for="f-colors">Colors</label><input class="input" id="f-colors" value="${esc((d.colors || []).join(', '))}" placeholder="Black, Navy"><div class="hint">Separate with commas. Optional.</div></div>
           </div>
+
+                    <div class="field" id="colorBox" hidden><span class="lbl">Photo for each color</span>
+            <div id="colorRows"></div>
+            <div class="hint">When a customer picks a color, the store shows that color's photo.</div></div>
+          <div class="field" id="varBox" hidden>
+            <label class="check"><input type="checkbox" id="f-usevar"${(d.variants || []).length ? ' checked' : ''}> Different price and stock for each size and color</label>
+            <div id="varTable" style="margin-top:.6rem"></div>
+            <div class="hint">Leave a price empty to use the product price. Total stock is counted automatically.</div></div>
+
           <div class="field"><label for="f-desc">Description</label><textarea class="textarea" id="f-desc" rows="4" maxlength="3000">${esc(d.description)}</textarea></div>
 
           <div class="field"><span class="lbl">Photos</span>
@@ -429,6 +442,8 @@
         colors: $('#f-colors', dlg).value,
         description: $('#f-desc', dlg).value.trim(),
         images: imgs,
+                colorImages: Object.fromEntries(csv('#f-colors').filter((c) => cimg[c]).map((c) => [c, cimg[c]])),
+        variants: useVars() ? combos().map((cb) => { const r = rowOf(cb); return { size: cb.size, color: cb.color, price: Number(r.price) || 0, stock: Math.max(0, Math.floor(Number(r.stock) || 0)) }; }) : [],
         featured: $('#f-featured', dlg).checked,
         active: $('#f-active', dlg).checked,
       };

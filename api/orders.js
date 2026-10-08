@@ -5,6 +5,18 @@ const {
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
+const variantOf = (p, size, color) => (p.variants || []).find((v) => (v.size || '') === (size || '') && (v.color || '') === (color || ''));
+
+// change the stock of one size + color (or of the whole product when it has no variants)
+function changeStock(p, size, color, delta) {
+  if (!p) return;
+  if (p.variants && p.variants.length) {
+    const v = variantOf(p, size, color);
+    if (v) v.stock = Math.max(0, v.stock + delta);
+    p.stock = p.variants.reduce((n, x) => n + x.stock, 0);
+  } else p.stock = Math.max(0, p.stock + delta);
+}
+
 module.exports = async (req, res) => {
   try {
     const q = getQuery(req);
@@ -35,19 +47,22 @@ module.exports = async (req, res) => {
         const p = products.find((x) => x.id === it.id && x.active !== false);
         const qty = Math.max(1, Math.min(20, Math.floor(Number(it.qty) || 1)));
         if (!p) return send(res, 400, { error: 'A product in your cart is no longer available' });
-        if (p.stock < qty) return send(res, 400, { error: `Only ${p.stock} left in stock for "${p.name}"` });
-        const unit = p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price;
-        items.push({ id: p.id, name: p.name, image: p.images[0] || '', size: clean(it.size, 20), color: clean(it.color, 30), qty, price: unit });
-        subtotal += unit * qty;
+                const size = clean(it.size, 40), color = clean(it.color, 40);
+        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+        const v = hasVariants ? variantOf(p, size, color) : null;
+        if (hasVariants && !v) return send(res, 400, { error: `This size or color of "${p.name}" is not available` });
+        const have = hasVariants ? v.stock : p.stock;
+        if (have < qty) return send(res, 400, { error: `Only ${have} left in stock for "${p.name}"${size || color ? ' (' + [size, color].filter(Boolean).join(', ') + ')' : ''}` });
+        const unit = v && v.price > 0 ? v.price : p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price;
+        items.push({ id: p.id, name: p.name, image: (p.colorImages || {})[color] || p.images[0] || '', size, color, qty, price: unit });
       }
 
       const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
       const shipping = free ? 0 : customer.area === 'outside' ? settings.shippingOutside : settings.shippingInside;
 
       // reduce stock
-      for (const it of items) {
-        const p = products.find((x) => x.id === it.id);
-        p.stock -= it.qty;
+            for (const it of items) {
+        changeStock(products.find((x) => x.id === it.id), it.size, it.color, -it.qty);
       }
       await dbSet('products', products);
 
@@ -81,7 +96,7 @@ module.exports = async (req, res) => {
         const products = await getProducts();
         for (const it of orders[i].items) {
           const p = products.find((x) => x.id === it.id);
-          if (p) p.stock = Math.max(0, p.stock + (b.status === 'cancelled' ? it.qty : -it.qty));
+          if (p) changeStock(p, it.size, it.color, b.status === 'cancelled' ? it.qty : -it.qty);
         }
         await dbSet('products', products);
       }

@@ -26,7 +26,7 @@
       return JW.cart.get().map((c) => ({ ...c, p: products.find((p) => p.id === c.id) })).filter((l) => l.p);
     }
     function totals() {
-      const subtotal = lines().reduce((n, l) => n + JW.unitPrice(l.p) * l.qty, 0);
+      const subtotal = lines().reduce((n, l) => n + JW.priceOf(l.p, l.size, l.color) * l.qty, 0);
       const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
       const shipping = !subtotal || free ? 0 : area === 'outside' ? settings.shippingOutside : settings.shippingInside;
       return { subtotal, shipping, total: subtotal + shipping, free };
@@ -48,11 +48,11 @@
         <div class="cart-layout">
           <div id="items">${ls.map((l, i) => `
             <div class="cart-row">
-              <a class="cart-thumb" href="/product?id=${encodeURIComponent(l.p.id)}">${l.p.images[0] ? `<img src="${JW.esc(l.p.images[0])}" alt="">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
+              <a class="cart-thumb" href="/product?id=${encodeURIComponent(l.p.id)}">${JW.imageOf(l.p, l.color) ? `<img src="${JW.esc(JW.imageOf(l.p, l.color))}" alt="">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
               <div>
                 <a href="/product?id=${encodeURIComponent(l.p.id)}" style="font-weight:600">${JW.esc(l.p.name)}</a>
                 <div class="cart-meta">${[l.size && 'Size ' + JW.esc(l.size), l.color && JW.esc(l.color)].filter(Boolean).join(', ') || '&nbsp;'}</div>
-                <div class="cart-meta">${JW.money(JW.unitPrice(l.p))} each${l.p.stock < l.qty ? ` <b style="color:var(--sale)">(only ${l.p.stock} in stock)</b>` : ''}</div>
+                <div class="cart-meta">${JW.money(JW.priceOf(l.p, l.size, l.color))} each${JW.stockOf(l.p, l.size, l.color) < l.qty ? ` <b style="color:var(--sale)">(only ${JW.stockOf(l.p, l.size, l.color)} in stock)</b>` : ''}</div>
                 <div class="qty small" style="margin-top:.6rem">
                   <button type="button" data-act="minus" data-i="${i}" aria-label="Decrease quantity">&minus;</button>
                   <input type="number" value="${l.qty}" min="1" max="20" data-i="${i}" aria-label="Quantity">
@@ -60,7 +60,7 @@
                 </div>
               </div>
               <div class="cart-right">
-                <b>${JW.money(JW.unitPrice(l.p) * l.qty)}</b>
+                <b>${JW.money(JW.priceOf(l.p, l.size, l.color) * l.qty)}</b>
                 <button class="cart-remove" data-act="remove" data-i="${i}">Remove</button>
               </div>
             </div>`).join('')}

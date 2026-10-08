@@ -79,6 +79,13 @@
   const unitPrice = (p) => (p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price);
   const onSale = (p) => p.salePrice > 0 && p.salePrice < p.price;
 
+    // size + color options: each can have its own price, stock and photo
+  const hasVariants = (p) => Array.isArray(p.variants) && p.variants.length > 0;
+  const variantOf = (p, size, color) => (p.variants || []).find((v) => (v.size || '') === (size || '') && (v.color || '') === (color || '')) || null;
+  const stockOf = (p, size, color) => (hasVariants(p) ? (variantOf(p, size, color) || { stock: 0 }).stock : p.stock);
+  const priceOf = (p, size, color) => { const v = variantOf(p, size, color); return v && v.price > 0 ? v.price : unitPrice(p); };
+  const imageOf = (p, color) => (p.colorImages || {})[color] || (p.images || [])[0] || '';
+
   function imgTag(src, alt, cls) {
     return src ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"${cls ? ` class="${cls}"` : ''}>` : '';
   }
@@ -201,6 +208,6 @@
     });
   }
 
-  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, imgTag, productCard, catTile, loadSettings, renderChrome, updateCartCount,
+  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, hasVariants, variantOf, stockOf, priceOf, imageOf, imgTag, productCard, catTile, loadSettings, renderChrome, updateCartCount,
     loadCats, tops, kidsOf, bySlug, topOf, catPath, catUrl, setActive };
 })();

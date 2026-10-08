@@ -12,6 +12,26 @@ function normalize(b, cur = {}) {
     .map((x) => clean(x, 40)).filter(Boolean).slice(0, 20);
   const images = (Array.isArray(b.images) ? b.images : cur.images || [])
     .map((x) => clean(x, 500)).filter(Boolean).slice(0, 8);
+  const sizes = b.sizes !== undefined ? list(b.sizes) : cur.sizes || [];
+  const colors = b.colors !== undefined ? list(b.colors) : cur.colors || [];
+
+  // one row for each size + color: its own price (0 = use the product price) and its own stock
+  const rows = Array.isArray(b.variants) ? b.variants : b.variants === undefined ? cur.variants || [] : [];
+  const seen = new Set();
+  const variants = [];
+  for (const v of rows.slice(0, 120)) {
+    const size = clean(v.size, 40), color = clean(v.color, 40);
+    if (!size && !color) continue;
+    if ((size && !sizes.includes(size)) || (color && !colors.includes(color))) continue;
+    if (seen.has(size + '|' + color)) continue;
+    seen.add(size + '|' + color);
+    variants.push({ size, color, price: num(v.price), stock: Math.floor(num(v.stock)) });
+  }
+
+  // the photo shown when a customer picks a color
+  const source = b.colorImages !== undefined ? b.colorImages : cur.colorImages;
+  const colorImages = {};
+  if (source && typeof source === 'object') colors.forEach((c) => { const u = clean(source[c], 500); if (u) colorImages[c] = u; });
 
   return {
     name: clean(b.name ?? cur.name, 120),
@@ -20,9 +40,11 @@ function normalize(b, cur = {}) {
     salePrice: num(b.salePrice ?? cur.salePrice),
     category: clean(b.category ?? cur.category, 80),
     images,
-    sizes: b.sizes !== undefined ? list(b.sizes) : cur.sizes || [],
-    colors: b.colors !== undefined ? list(b.colors) : cur.colors || [],
-    stock: Math.floor(num(b.stock ?? cur.stock)),
+    sizes,
+    colors,
+    variants,
+    colorImages,
+    stock: variants.length ? variants.reduce((n, v) => n + v.stock, 0) : Math.floor(num(b.stock ?? cur.stock)),
     featured: b.featured !== undefined ? !!b.featured : !!cur.featured,
     active: b.active !== undefined ? !!b.active : cur.active !== false,
   };
