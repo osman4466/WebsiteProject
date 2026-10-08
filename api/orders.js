@@ -55,6 +55,7 @@ module.exports = async (req, res) => {
         if (have < qty) return send(res, 400, { error: `Only ${have} left in stock for "${p.name}"${size || color ? ' (' + [size, color].filter(Boolean).join(', ') + ')' : ''}` });
         const unit = v && v.price > 0 ? v.price : p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price;
         items.push({ id: p.id, name: p.name, image: (p.colorImages || {})[color] || p.images[0] || '', size, color, qty, price: unit });
+           subtotal += unit * qty;
       }
 
       const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
