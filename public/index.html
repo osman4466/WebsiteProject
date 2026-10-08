@@ -15,21 +15,6 @@
   <div id="chrome-top"></div>
 
   <main>
-    <section class="hero">
-      <div class="hero-inner">
-        <div class="hero-copy">
-          <h1>Wear the legacy.</h1>
-          <p>Men's and women's streetwear drawn from the Janissary orders: tees, polos and drop shoulders. Order today and pay when it arrives at your door.</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="/products">Shop the collection</a>
-            <a class="btn btn-ghost" href="/categories">Browse categories</a>
-          </div>
-        </div>
-      </div>
-      <div class="standard" aria-hidden="true">
-        <span class="standard-name store-name">Janissary Wear</span>
-      </div>
-    </section>
 
     <div id="sections"></div>
 
@@ -54,7 +39,6 @@
   <script src="/js/app.js"></script>
   <script>
     JW.renderChrome('home');
-    document.querySelector('.standard').insertAdjacentHTML('afterbegin', JW.STAR('#FAFAF7', '#B08A3A'));
 
     const sectionsBox = document.getElementById('sections');
     sectionsBox.innerHTML = '<div class="wrap home-sec"><div class="car-track">' +

@@ -117,42 +117,6 @@ body.no-scroll { overflow: hidden; }
   .wrap { padding: 0 16px; }
 }
 
-/* ---------- hero with hanging regimental standard ---------- */
-.hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
-.hero-inner { max-width: var(--wrap); margin: 0 auto; padding: 2.2rem 24px; min-height: 300px; display: flex; align-items: center; }
-.hero-copy { max-width: 38rem; position: relative; z-index: 1; }
-.hero-copy h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); margin-bottom: 1rem; }
-.hero-copy p { font-size: 1.05rem; color: var(--smoke); max-width: 32rem; margin-bottom: 1.4rem; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-
-.standard {
-  position: absolute; top: 0; right: max(24px, calc((100vw - var(--wrap)) / 2 + 24px));
-  width: 190px; height: 300px;
-  background-color: var(--accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23D8B35A' stroke-width='1' opacity='.6'%3E%3Crect x='14' y='14' width='28' height='28'/%3E%3Crect x='14' y='14' width='28' height='28' transform='rotate(45 28 28)'/%3E%3C/g%3E%3C/svg%3E");
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 64px), 0 100%);
-  color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px; padding: 34px 0 70px;
-  transform-origin: top center;
-  animation: sway 2.6s ease-out 1 both;
-}
-.standard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 10px; background: var(--brass); }
-.standard svg { width: 64px; height: 64px; }
-.standard .standard-name { writing-mode: vertical-rl; font-family: var(--font-display); font-size: 1.5rem; letter-spacing: .04em; color: #fff; padding: 6px 0; }
-.standard-name::after { content: ""; display: block; }
-@keyframes sway { 0% { transform: rotate(-4deg); } 35% { transform: rotate(2.4deg); } 65% { transform: rotate(-1deg); } 100% { transform: rotate(0); } }
-
-@media (max-width: 900px) {
-  .standard { width: 84px; height: 170px; padding: 18px 0 40px; gap: 8px; right: 16px; }
-  .standard svg { width: 38px; height: 38px; }
-  .standard .standard-name { display: none; }
-  .hero-inner { min-height: 0; padding: 1.4rem 112px 1.5rem 16px; }
-  .hero-copy h1 { font-size: 2rem; margin-bottom: .6rem; }
-  .hero-copy p { font-size: .95rem; margin-bottom: 1rem; }
-  .hero-actions .btn-ghost { display: none; }
-  .hero-actions .btn { padding: .65rem 1.2rem; }
-}
-@media (max-width: 420px) { .hero-inner { padding-right: 100px; } .hero-copy p { display: none; } }
-
 /* ---------- sections ---------- */
 .section { padding: 4.5rem 0; }
 .section-tight { padding: 3rem 0; }
