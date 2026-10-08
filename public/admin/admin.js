@@ -416,6 +416,68 @@
       }
     });
 
+        // ----- photo for each color, and price + stock for each size and color -----
+    const csv = (sel) => [...new Set($(sel, dlg).value.split(',').map((x) => x.trim()).filter(Boolean))].slice(0, 20);
+    const combos = () => {
+      const s = csv('#f-sizes'), c = csv('#f-colors');
+      if (!s.length && !c.length) return [];
+      return (s.length ? s : ['']).flatMap((size) => (c.length ? c : ['']).map((color) => ({ size, color })));
+    };
+    const useVars = () => $('#f-usevar', dlg).checked && combos().length > 0;
+    const rowOf = (cb) => vstore[cb.size + '|' + cb.color] || {};
+
+    function syncStock() {
+      const f = $('#f-stock', dlg), on = useVars();
+      f.disabled = on;
+      if (on) f.value = combos().reduce((n, cb) => n + Math.max(0, Math.floor(Number(rowOf(cb).stock) || 0)), 0);
+    }
+
+    function drawColors() {
+      const list = csv('#f-colors');
+      $('#colorBox', dlg).hidden = !list.length;
+      $('#colorRows', dlg).innerHTML = list.map((c, i) => `
+        <div class="color-row"><span class="color-name">${esc(c)}</span>
+          ${cimg[c] ? `<img class="color-thumb" src="${esc(cimg[c])}" alt="">` : '<span class="muted">No photo</span>'}
+          <button type="button" class="btn btn-dark btn-sm" data-cpick="${i}">Choose photo</button>
+          ${cimg[c] ? `<button type="button" class="btn btn-ghost btn-sm" data-cclear="${i}">Clear</button>` : ''}</div>`).join('');
+    }
+
+    function drawVars() {
+      const list = combos();
+      $('#varBox', dlg).hidden = !list.length;
+      const base = Number($('#f-price', dlg).value) || '';
+      $('#varTable', dlg).innerHTML = useVars() ? `<div class="table-wrap"><table class="t vt"><thead><tr><th>Size</th><th>Color</th><th>Price (৳)</th><th>Stock</th></tr></thead><tbody>${list.map((cb) => {
+        const k = cb.size + '|' + cb.color, r = rowOf(cb);
+        return `<tr><td>${esc(cb.size) || '-'}</td><td>${esc(cb.color) || '-'}</td>
+          <td><input class="input" type="number" min="0" step="1" data-vk="${esc(k)}" data-vf="price" value="${esc(r.price ?? '')}" placeholder="${esc(base)}"></td>
+          <td><input class="input" type="number" min="0" step="1" data-vk="${esc(k)}" data-vf="stock" value="${esc(r.stock ?? '')}" placeholder="0"></td></tr>`;
+      }).join('')}</tbody></table></div>` : '';
+      syncStock();
+    }
+
+    $('#varTable', dlg).addEventListener('input', (e) => {
+      const el = e.target.closest('[data-vk]'); if (!el) return;
+      (vstore[el.dataset.vk] = vstore[el.dataset.vk] || {})[el.dataset.vf] = el.value;
+      syncStock();
+    });
+    $('#colorRows', dlg).addEventListener('click', (e) => {
+      const list = csv('#f-colors');
+      const pk = e.target.closest('[data-cpick]'), cl = e.target.closest('[data-cclear]');
+      if (cl) { delete cimg[list[+cl.dataset.cclear]]; drawColors(); }
+      if (pk) {
+        const c = list[+pk.dataset.cpick];
+        openPicker({ multiple: false, max: 1, onPick: (urls) => {
+          if (!urls[0]) return;
+          cimg[c] = urls[0];
+          if (!imgs.includes(urls[0]) && imgs.length < 8) imgs.push(urls[0]);
+          drawImgs(); drawColors();
+        } });
+      }
+    });
+    ['#f-sizes', '#f-colors'].forEach((sel) => $(sel, dlg).addEventListener('input', () => { drawColors(); drawVars(); }));
+    $('#f-usevar', dlg).addEventListener('change', drawVars);
+    drawColors(); drawVars();
+    
     $('#f-pick', dlg).addEventListener('click', () => {
       const room = 8 - imgs.length;
       if (room <= 0) { $('#pf-err', dlg).textContent = 'You can add up to 8 photos.'; return; }
