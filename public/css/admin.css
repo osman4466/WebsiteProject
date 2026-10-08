@@ -29,7 +29,7 @@ body.admin { background: #F3F3F1; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 1.6rem; }
 .stat { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.2rem; }
-.stat b { display: block; font-family: var(--font-display); font-weight: 400; font-size: 2.1rem; line-height: 1.1; }
+.stat b { display: block; font-weight: 700; font-size: 2.1rem; line-height: 1.1; }
 .stat span { color: var(--smoke); font-size: .92rem; }
 .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.3rem; margin-bottom: 1.2rem; }
 .card h2 { font-size: 1.4rem; margin-bottom: .9rem; }
