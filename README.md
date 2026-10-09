@@ -9,7 +9,8 @@
 | হোম | `/` |
 | ক্যাটাগরি (Men / Women ও তাদের স্টাইল) | `/categories` |
 | সব প্রোডাক্ট (ফিল্টার, সার্চ, সর্ট) | `/products` |
-| প্রোডাক্ট ডিটেইল | `/product?id=...` |
+| প্রোডাক্ট ডিটেইল | `/product/<নাম>-<কোড>` (পুরোনো `/product?id=...` নিজে থেকে নতুন লিংকে যায়) |
+| sitemap ও robots | `/sitemap.xml`, `/robots.txt` |
 | কার্ট ও চেকআউট (ক্যাশ অন ডেলিভারি) | `/cart` |
 | অ্যাডমিন প্যানেল | `/admin` |
 
@@ -17,13 +18,15 @@
 
 ```
 janissary-wear/
-├── public/            ওয়েবসাইটের পেজ, CSS, JS
-│   ├── index.html, categories.html, products.html, product.html, cart.html
+├── views/             ওয়েবসাইটের পেজের টেমপ্লেট (index, categories, products, product, cart)
+├── public/            CSS, JS, অ্যাডমিন প্যানেল
 │   ├── admin/         অ্যাডমিন প্যানেল (index.html + admin.js)
 │   ├── css/           style.css, admin.css
-│   └── js/app.js
+│   └── js/            app.js, track.js (Pixel ও GA4 ইভেন্ট)
 ├── api/               ব্যাকএন্ড (Vercel serverless functions)
-│   ├── login.js  products.js  categories.js  orders.js  image.js  settings.js
+│   ├── page.js        পেজে SEO ট্যাগ বসিয়ে পাঠায়;  sitemap.js  robots.js
+│   ├── track.js  tracking.js  _track.js   Meta Conversions API ও GA4
+│   ├── login.js  products.js  categories.js  orders.js  image.js  settings.js  home.js  media.js  backup.js
 │   └── _lib.js        ডাটাবেস + লগইন সিকিউরিটি
 ├── server.js          শুধু নিজের কম্পিউটারে টেস্ট করার জন্য
 ├── vercel.json
@@ -91,6 +94,19 @@ Node.js ১৮+ থাকলে: `ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=tes
 ## সাইট আপডেট করার নিরাপদ নিয়ম (Vercel)
 
 1. নতুন zip এক্সট্র্যাক্ট করুন।
-2. GitHub রিপোতে **Add file > Upload files** দিয়ে ভেতরের সব কিছু (`api`, `public`, `package.json`, `vercel.json`, `server.js`, `README.md`) আবার আপলোড করুন। একই নামের ফাইল নিজে থেকে বদলে যায়।
+2. GitHub রিপোতে **Add file > Upload files** দিয়ে ভেতরের সব কিছু (`api`, `views`, `public`, `package.json`, `vercel.json`, `server.js`, `README.md`) আবার আপলোড করুন। একই নামের ফাইল নিজে থেকে বদলে যায়।
 3. **Commit changes** চাপলে Vercel নিজে নতুন করে ডেপ্লয় করে (১-২ মিনিট)। Environment Variables ও ডাটাবেস আর বদলাতে হয় না।
 4. শেষে `/api/health` খুলে `"database":"connected"` দেখুন।
+
+## Media (ছবির লাইব্রেরি)
+
+- `/admin` > **Media**-তে ছবি একবার আপলোড করুন, তারপর প্রোডাক্ট বা ক্যাটাগরির ফর্মে **Choose from Media** চেপে ছবি বেছে নিন। একই ছবি বহু প্রোডাক্টে লাগানো যায়।
+- প্রোডাক্ট বা ক্যাটাগরি মুছলে ছবি লাইব্রেরিতে থেকে যায়। ছবি মুছতে হলে Media থেকে **Delete** করুন।
+- ছবি সাইটের ডাটাবেসে (Upstash) জমা হয়। জায়গা সীমিত (২৫৬ MB), তাই প্রডাক্ট অনেক বাড়লে আলাদা ছবির হোস্টিংয়ে যেতে হবে।
+- **Download backup** বাটনে প্রোডাক্ট, ক্যাটাগরি, অর্ডার, সেটিংস, হোমপেজ সেকশন, ট্র্যাকিং সেটিংস ও ছবির তালিকা এক ফাইলে নামে। নতুন হোস্টিংয়ে যাওয়ার আগে এটা নামিয়ে রাখুন। গোপন টোকেন এতে থাকে না।
+
+## SEO ও ট্র্যাকিং
+
+- `/admin` > **Tracking** পেজে Meta Pixel ID, Conversions API token, Test Event Code, GA4 ID, API secret, Search Console কোড ও Site URL দেওয়া যায়। টোকেন সেভ করার পর আর পড়া যায় না, শুধু বদলানো বা মোছা যায়।
+- ইভেন্ট: PageView, ViewContent, ViewCategory, Search, AddToCart, InitiateCheckout, AddPaymentInfo, Purchase (অর্ডার দেওয়ার সাথে সাথে), Contact (WhatsApp)। প্রতিটি ব্রাউজার ও সার্ভার থেকে একই event id-তে যায়, তাই দুবার গোনা হয় না।
+- নিজের ডোমেইন কিনলে শুধু Tracking পেজে **Site URL** বদলান।

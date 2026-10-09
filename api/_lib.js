@@ -206,10 +206,31 @@ function clean(v, max = 200) {
   return String(v == null ? '' : v).trim().slice(0, max);
 }
 
+// ---------- product links (/product/<name>-<last 5 characters of the id>) ----------
+function productSlug(p) {
+  const base = String(p.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60).replace(/-+$/, '');
+  return (base || 'product') + '-' + String(p.id).slice(-5);
+}
+const withSlug = (p) => ({ ...p, slug: productSlug(p) });
+// finds a product from its link part; the old name still works after a rename because only the id part counts
+function findBySlug(list, slug) {
+  const s = String(slug || '');
+  const tail = s.slice(s.lastIndexOf('-') + 1);
+  return list.find((p) => p.id === s) || list.find((p) => productSlug(p) === s) || list.find((p) => String(p.id).slice(-5) === tail) || null;
+}
+
+// the public address of the site: the Site URL set in Admin > Tracking, otherwise the address the visitor used
+function siteBase(req, override) {
+  if (override) return String(override).replace(/\/+$/, '');
+  const h = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+  const proto = String(req.headers['x-forwarded-proto'] || (/^(localhost|127\.)/.test(h) ? 'http' : 'https')).split(',')[0].trim();
+  return proto + '://' + h;
+}
+
 module.exports = {
   HAS_REDIS, ON_VERCEL, redis, dbGet, dbSet, dbDel,
   getSettings, getCategories, getProducts, withDescendants, DEFAULT_SETTINGS,
   send, getQuery, getBody,
   sign, verify, isAdmin, requireAdmin, safeEqual,
-  uid, slugify, clean,
+  uid, slugify, clean, productSlug, withSlug, findBySlug, siteBase,
 };

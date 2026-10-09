@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your cart | Janissary Wear</title>
+  <!--SEO-->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,10 +16,12 @@
   <div id="chrome-bottom"></div>
 
   <script src="/js/app.js"></script>
+  <script src="/js/track.js"></script>
   <script>
     JW.renderChrome('');
     const root = document.getElementById('root');
     let products = [], settings = { shippingInside: 70, shippingOutside: 130, freeShippingOver: 0 }, area = 'inside';
+    let checkoutStarted = false, paymentInfoSent = false;      // tracking: send each of these once
 
     // cart lines joined with live product data (price, stock)
     function lines() {
@@ -43,14 +45,18 @@
         return;
       }
       const t = totals();
+      if (!checkoutStarted) {
+        checkoutStarted = true;
+        JW.track('InitiateCheckout', { items: ls.map((l) => JW.trackItem(l.p, l.size, l.color, l.qty)), value: t.subtotal });
+      }
       root.innerHTML = `
         <div class="page-head" style="padding-bottom:1.2rem;border:0"><h1 style="font-size:clamp(2.2rem,5vw,3.4rem)">Your cart</h1></div>
         <div class="cart-layout">
           <div id="items">${ls.map((l, i) => `
             <div class="cart-row">
-              <a class="cart-thumb" href="/product?id=${encodeURIComponent(l.p.id)}">${JW.imageOf(l.p, l.color) ? `<img src="${JW.esc(JW.imageOf(l.p, l.color))}" alt="">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
+              <a class="cart-thumb" href="${JW.productUrl(l.p)}">${JW.imageOf(l.p, l.color) ? `<img src="${JW.esc(JW.imageOf(l.p, l.color))}" alt="">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
               <div>
-                <a href="/product?id=${encodeURIComponent(l.p.id)}" style="font-weight:600">${JW.esc(l.p.name)}</a>
+                <a href="${JW.productUrl(l.p)}" style="font-weight:600">${JW.esc(l.p.name)}</a>
                 <div class="cart-meta">${[l.size && 'Size ' + JW.esc(l.size), l.color && JW.esc(l.color)].filter(Boolean).join(', ') || '&nbsp;'}</div>
                 <div class="cart-meta">${JW.money(JW.priceOf(l.p, l.size, l.color))} each${JW.stockOf(l.p, l.size, l.color) < l.qty ? ` <b style="color:var(--sale)">(only ${JW.stockOf(l.p, l.size, l.color)} in stock)</b>` : ''}</div>
                 <div class="qty small" style="margin-top:.6rem">
@@ -106,6 +112,13 @@
         keepForm(() => { JW.cart.set(items); render(); });
       }));
       root.querySelectorAll('input[name=area]').forEach((r) => r.addEventListener('change', () => { keepForm(() => { area = r.value; render(); }); }));
+      // name, phone and address are filled in: the customer is about to pay
+      document.getElementById('address').addEventListener('change', () => {
+        const name = document.getElementById('name').value.trim(), phone = document.getElementById('phone').value.trim();
+        if (paymentInfoSent || !name || !/^[0-9+\-\s]{10,16}$/.test(phone) || !document.getElementById('address').value.trim()) return;
+        paymentInfoSent = true;
+        JW.track('AddPaymentInfo', { items: ls.map((l) => JW.trackItem(l.p, l.size, l.color, l.qty)), value: t.subtotal, user: { phone, name } });
+      });
       document.getElementById('form').addEventListener('submit', submit);
     }
 
@@ -134,8 +147,10 @@
       btn.disabled = true; btn.textContent = 'Placing order...';
       try {
         const items = JW.cart.get().map(({ id, size, color, qty }) => ({ id, size, color, qty }));
-        const r = await JW.api('orders', { method: 'POST', body: { customer, items } });
+        const r = await JW.api('orders', { method: 'POST', body: { customer, items, tracking: JW.orderTracking() } });
         JW.cart.clear();
+        // the server has already told Meta and Google; this browser copy carries the same id, so it is counted once
+        JW.track('Purchase', { items: r.items, value: r.total }, { eventId: r.eventId });
         root.innerHTML = `<div class="success">${JW.STAR('#0A0A0A', '#D8B35A')}<h1>Order placed</h1>
           <p>Your order number is <b>${JW.esc(r.number)}</b>.</p>
           <div class="sum-box">

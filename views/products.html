@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>All products | Janissary Wear</title>
-  <meta name="description" content="Shop every Janissary Wear piece for men and women. Filter by style, search by name, pay on delivery.">
+  <!--SEO-->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,11 +41,12 @@
   <div id="chrome-bottom"></div>
 
   <script src="/js/app.js"></script>
+  <script src="/js/track.js"></script>
   <script>
     JW.renderChrome();
     const params = new URLSearchParams(location.search);
     let active = params.get('category') || '';     // slug of a main category or a sub-category, '' = everything
-    let all = [], cats = [];
+    let all = [], cats = [], shown = [];
     const grid = document.getElementById('grid');
     const qEl = document.getElementById('q');
     const sortEl = document.getElementById('sort');
@@ -77,10 +77,11 @@
       const t = qEl.value.trim().toLowerCase();
       const allowed = active ? slugsFor(active) : null;
       let list = all.filter((p) => (!allowed || allowed.includes(p.category)) && (!t || (p.name + ' ' + p.description).toLowerCase().includes(t)));
+      shown = list;
       if (sortEl.value === 'low') list.sort((a, b) => JW.unitPrice(a) - JW.unitPrice(b));
       else if (sortEl.value === 'high') list.sort((a, b) => JW.unitPrice(b) - JW.unitPrice(a));
       else if (sortEl.value === 'new') list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      else if (sortEl.value === 'order') list.sort((a, b) => a.order - b.order);
+      // 'order' keeps the order the shop owner set in the admin panel (the API already returns it that way)
 
       const cat = JW.bySlug(active, cats);
       const parent = cat && cat.parent ? JW.bySlug(cat.parent, cats) : null;
@@ -97,20 +98,31 @@
         : `<div class="empty" style="grid-column:1/-1"><h3>${all.length ? 'Nothing here yet' : 'No products yet'}</h3><p>${all.length ? 'Try another category or clear the search.' : 'New pieces will appear here as soon as they are added.'}</p></div>`;
     }
 
+    // a customer looked at a category (or the whole shop)
+    function trackList() {
+      const cat = JW.bySlug(active, cats);
+      JW.track('ViewCategory', { category: cat ? JW.catPath(cat.slug, cats) : 'All products', items: shown.slice(0, 10).map((p) => JW.trackItem(p)) });
+    }
+
     function pick(e) {
       const b = e.target.closest('.chip'); if (!b) return;
       active = b.dataset.slug;
       history.replaceState(null, '', active ? '?category=' + encodeURIComponent(active) : location.pathname);
       JW.setActive(active);
-      drawChips(); draw();
+      drawChips(); draw(); trackList();
     }
     document.getElementById('chips').addEventListener('click', pick);
     document.getElementById('subchips').addEventListener('click', pick);
-    qEl.addEventListener('input', draw);
+    let searchTimer;
+    qEl.addEventListener('input', () => {
+      draw();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { if (qEl.value.trim().length >= 2) JW.track('Search', { search: qEl.value.trim() }); }, 900);
+    });
     sortEl.addEventListener('change', draw);
 
     Promise.all([JW.loadCats(), JW.api('products')]).then(([c, p]) => {
-      cats = c; all = p; drawChips(); draw();
+      cats = c; all = p; drawChips(); draw(); trackList();
     }).catch((e) => {
       grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div>`;
     });

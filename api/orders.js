@@ -2,6 +2,7 @@ const {
   send, getQuery, getBody, getProducts, getSettings, dbGet, dbSet,
   requireAdmin, uid, clean,
 } = require('./_lib');
+const { forward } = require('./_track');
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
@@ -76,7 +77,23 @@ module.exports = async (req, res) => {
       };
       orders.unshift(order);
       await dbSet('orders', orders.slice(0, 2000));
-      return send(res, 201, { number: order.number, subtotal, shipping, total: order.total });
+      // tell Meta and Google about the purchase from the server (the browser sends the same event with the same id, so it is counted once)
+      const t = b.tracking && typeof b.tracking === 'object' ? b.tracking : {};
+      let timer;
+      await Promise.race([
+        forward(req, {
+          name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
+          items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+          fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
+        }),
+        new Promise((resolve) => { timer = setTimeout(resolve, 5000); }),
+      ]);
+      clearTimeout(timer);
+
+      return send(res, 201, {
+        number: order.number, eventId: order.id, subtotal, shipping, total: order.total,
+        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+      });
     }
 
     // ---- Admin only below ----

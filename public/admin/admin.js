@@ -121,7 +121,7 @@
   function dropImages() {}
 
   // ---------- router ----------
-  const VIEWS = { overview, products, homepage, media, categories, orders, settings };
+  const VIEWS = { overview, products, homepage, media, categories, orders, tracking, settings };
   function route() {
     const v = (location.hash || '#overview').slice(1);
     const name = VIEWS[v] ? v : 'overview';
@@ -923,6 +923,77 @@
     $('#hp-ok', picker).addEventListener('click', () => { s.productIds = sel; picker.close(); drawHome(); });
     draw(); picker.showModal();
   };
+
+  // ---------- tracking (Meta Pixel, Conversions API, Google Analytics 4, Search Console) ----------
+  async function tracking() {
+    view.innerHTML = '<div class="view-head"><div><h1>Tracking</h1></div></div><p class="muted">Loading...</p>';
+    let r;
+    try { r = await A('tracking'); } catch (e) { view.innerHTML = `<div class="card"><p class="form-error">${esc(e.message)}</p></div>`; return; }
+    const c = r.config, sec = r.secrets;
+    const chk = (id, label, on) => `<label class="hs-vis"><input type="checkbox" id="t-${id}"${on ? ' checked' : ''}> ${label}</label>`;
+    const txt = (id, label, val, extra = '') => `<div class="field"><label for="t-${id}">${label}</label><input class="input" id="t-${id}" value="${esc(val)}" autocomplete="off" ${extra}></div>`;
+    const secret = (id, label, s, clearId) => `<div class="field"><label for="t-${id}">${label}</label>
+      <input class="input" id="t-${id}" type="password" autocomplete="new-password" placeholder="${s.set ? 'Saved ' + esc(s.hint) + ' - type a new one to replace it' : 'Paste it here'}">
+      ${s.fromEnv ? '<div class="hint">A value from the Vercel environment is being used and wins over this box.</div>'
+        : s.set ? `<label class="hs-vis" style="margin-top:.4rem"><input type="checkbox" id="t-${clearId}"> Remove the saved one</label>` : ''}</div>`;
+    const logRows = r.log.map((l) => `<tr><td>${fmtDate(l.t)}</td><td><b>${esc(l.event)}</b><div class="muted">${esc(l.id || '')}</div></td><td>${l.value ? money(l.value) : ''}</td>
+      <td class="${/^error/.test(l.meta) ? 'form-error' : ''}">${esc(l.meta)}</td><td class="${/^error/.test(l.ga) ? 'form-error' : ''}">${esc(l.ga)}</td></tr>`).join('');
+
+    view.innerHTML = `
+      <div class="view-head"><div><h1>Tracking</h1><p>Meta Pixel, Conversions API, Google Analytics 4 and Search Console. Every event is sent once, with one shared id.</p></div></div>
+      <form class="card" id="tf" novalidate style="max-width:760px">
+        <h2>Meta (Facebook)</h2>
+        ${txt('metaPixelId', 'Pixel ID', c.metaPixelId, 'inputmode="numeric" placeholder="Numbers only"')}
+        <div class="hs-btns" style="gap:18px;margin:-.2rem 0 1rem">${chk('metaBrowser', 'Browser Pixel', c.metaBrowser)}${chk('metaServer', 'Server events (Conversions API)', c.metaServer)}</div>
+        ${secret('metaToken', 'Conversions API access token', sec.metaToken, 'clearMeta')}
+        ${txt('testEventCode', 'Test Event Code', c.testEventCode, 'placeholder="TEST12345 (only while testing)"')}
+        <div class="hint" style="margin:-.6rem 0 1rem">While a Test Event Code is filled in, server events show only in Events Manager &gt; Test Events. Clear it when you finish testing.</div>
+
+        <h2 style="margin-top:1.4rem">Google Analytics 4</h2>
+        ${txt('gaId', 'Measurement ID', c.gaId, 'placeholder="G-XXXXXXXXXX"')}
+        <div class="hs-btns" style="gap:18px;margin:-.2rem 0 1rem">${chk('gaEnabled', 'Track with GA4', c.gaEnabled)}${chk('gaServer', 'Send purchases from the server too', c.gaServer)}</div>
+        ${secret('gaSecret', 'Measurement Protocol API secret', sec.gaSecret, 'clearGa')}
+
+        <h2 style="margin-top:1.4rem">Search Console and site address</h2>
+        ${txt('gscCode', 'Google Search Console verification code', c.gscCode, 'placeholder="Paste the code, or the whole meta tag"')}
+        ${txt('siteUrl', 'Site URL', c.siteUrl, 'placeholder="Leave empty until you have your own domain"')}
+        <div class="hint" style="margin:-.6rem 0 1rem">Used for the sitemap and for the links search engines see. Empty means the address the visitor used.</div>
+
+        <div class="hs-btns"><button class="btn btn-primary" id="t-save" type="submit">Save tracking</button>
+          <button class="btn btn-ghost" id="t-test" type="button">Save and send a test</button></div>
+        <div class="form-error" id="t-err" role="alert"></div>
+        <div id="t-result" style="margin-top:.6rem"></div>
+      </form>
+      <div class="card"><h2>Recent purchases, tests and errors</h2>
+        ${r.log.length ? `<div class="table-wrap"><table class="t" style="min-width:640px"><thead><tr><th>When</th><th>Event</th><th>Value</th><th>Meta</th><th>GA4</th></tr></thead><tbody>${logRows}</tbody></table></div>`
+          : '<p class="muted">Nothing yet. Orders and test events will appear here.</p>'}</div>`;
+
+    const val = (id) => $('#t-' + id).value;
+    const on = (id) => $('#t-' + id).checked;
+    async function save() {
+      const body = {
+        metaPixelId: val('metaPixelId'), metaBrowser: on('metaBrowser'), metaServer: on('metaServer'), testEventCode: val('testEventCode'),
+        gaId: val('gaId'), gaEnabled: on('gaEnabled'), gaServer: on('gaServer'), gscCode: val('gscCode'), siteUrl: val('siteUrl'),
+        metaToken: val('metaToken'), gaSecret: val('gaSecret'),
+        clearMetaToken: !!($('#t-clearMeta') && $('#t-clearMeta').checked), clearGaSecret: !!($('#t-clearGa') && $('#t-clearGa').checked),
+      };
+      await A('tracking', { method: 'PUT', body });
+    }
+    $('#tf').addEventListener('submit', async (e) => {
+      e.preventDefault(); $('#t-err').textContent = '';
+      try { await save(); toast('Tracking saved'); tracking(); } catch (ex) { $('#t-err').textContent = ex.message; }
+    });
+    $('#t-test').addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; $('#t-err').textContent = ''; $('#t-result').innerHTML = '<span class="muted">Sending...</span>';
+      try {
+        await save();
+        const t = await A('tracking?test=1', { method: 'POST', body: {} });
+        const line = (name, x) => `<div><b>${name}:</b> <span class="${x.state === 'error' ? 'form-error' : ''}">${x.state === 'ok' ? 'Working. ' + esc(x.message || '') : x.state === 'off' ? 'Skipped. ' + esc(x.message || '') : 'Failed. ' + esc(x.message || '')}</span></div>`;
+        $('#t-result').innerHTML = line('Meta Conversions API', t.meta) + line('Google Analytics 4', t.ga);
+      } catch (ex) { $('#t-err').textContent = ex.message; $('#t-result').innerHTML = ''; }
+      btn.disabled = false;
+    });
+  }
 
   // ---------- settings ----------
   function settings() {

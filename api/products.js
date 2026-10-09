@@ -1,6 +1,6 @@
 const {
   send, getQuery, getBody, getProducts, getCategories, dbSet, isAdmin,
-  requireAdmin, uid, clean, withDescendants,
+  requireAdmin, uid, clean, withDescendants, withSlug,
 } = require('./_lib');
 
 function normalize(b, cur = {}) {
@@ -68,7 +68,7 @@ module.exports = async (req, res) => {
       if (!isAdmin(req)) list = list.filter((p) => p.active !== false);
       if (q.id) {
         const p = list.find((x) => x.id === q.id);
-        return p ? send(res, 200, p) : send(res, 404, { error: 'Product not found' });
+        return p ? send(res, 200, withSlug(p)) : send(res, 404, { error: 'Product not found' });
       }
       if (q.category) {
         // a main category (like Men) also shows everything inside its sub-categories
@@ -82,7 +82,7 @@ module.exports = async (req, res) => {
       }
       list = list.slice().sort(q.sort === 'new' ? byNew : byOrder);
       if (q.limit) list = list.slice(0, Math.max(1, Number(q.limit) || 20));
-      return send(res, 200, list);
+      return send(res, 200, list.map(withSlug));
     }
 
     if (!requireAdmin(req, res)) return;

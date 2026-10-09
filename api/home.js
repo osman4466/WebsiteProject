@@ -2,7 +2,7 @@
 //   GET  /api/home            public: sections with their products already chosen
 //   GET  /api/home?raw=1      admin:  the saved settings (what the admin screen edits)
 //   PUT  /api/home            admin:  save { sections: [...] }
-const { send, getQuery, getBody, getProducts, getCategories, dbGet, dbSet, isAdmin, requireAdmin, uid, clean, withDescendants } = require('./_lib');
+const { send, getQuery, getBody, getProducts, getCategories, dbGet, dbSet, isAdmin, requireAdmin, uid, clean, withDescendants, withSlug } = require('./_lib');
 
 const SOURCES = ['manual', 'newest', 'featured', 'sale', 'category', 'all'];
 
@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
         if (s.source !== 'manual') list = list.slice(0, s.limit || 10);
         if (!list.length) continue;           // never show an empty section to customers
         const cat = s.source === 'category' ? cats.find((c) => c.slug === s.category) : null;
-        out.push({ id: s.id, title: s.title, type: s.type, link: cat ? '/products?category=' + encodeURIComponent(cat.slug) : '/products', products: list });
+        out.push({ id: s.id, title: s.title, type: s.type, link: cat ? '/products?category=' + encodeURIComponent(cat.slug) : '/products', products: list.map(withSlug) });
       }
       return send(res, 200, { sections: out });
     }

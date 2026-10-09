@@ -1,9 +1,11 @@
 const { send, getBody, getSettings, dbSet, requireAdmin, clean, DEFAULT_SETTINGS } = require('./_lib');
+const { getTracking, publicConfig } = require('./_track');
 
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
-      return send(res, 200, await getSettings());
+      // the public tracking IDs ride along, so every page learns them with the one settings request
+      return send(res, 200, { ...(await getSettings()), tracking: publicConfig(await getTracking()) });
     }
     if (req.method === 'PUT') {
       if (!requireAdmin(req, res)) return;

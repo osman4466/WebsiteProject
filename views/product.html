@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Product | Janissary Wear</title>
+  <!--SEO-->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,10 +18,11 @@
   <div id="chrome-bottom"></div>
 
   <script src="/js/app.js"></script>
+  <script src="/js/track.js"></script>
   <script>
     JW.renderChrome();
     const root = document.getElementById('root');
-    const id = new URLSearchParams(location.search).get('id');
+    const id = window.__PID__ || '';
     let settings = {};
     document.addEventListener('jw:settings', (e) => { settings = e.detail; if (window.__p) renderWA(); });
 
@@ -140,6 +141,7 @@
         clamp();
         const { size, color } = chosen();
         JW.cart.add({ id: p.id, size, color, qty: parseInt(qty.value) });
+        JW.track('AddToCart', { items: [JW.trackItem(p, size, color, parseInt(qty.value))] });
         JW.toast('Added to your cart');
       };
 
@@ -147,6 +149,7 @@
         clamp();
         const { size, color } = chosen();
         JW.cart.add({ id: p.id, size, color, qty: parseInt(qty.value) });
+        JW.track('AddToCart', { items: [JW.trackItem(p, size, color, parseInt(qty.value))] });
         location.href = '/cart';
       };
 
@@ -158,6 +161,8 @@
       if (settings.storeName) fill(settings);
       document.addEventListener('jw:settings', (e) => fill(e.detail));
       refresh();
+      const first = chosen();
+      JW.track('ViewContent', { items: [JW.trackItem(p, first.size, first.color, 1)], category: JW.catPath(p.category, cats) });
     }).catch((e) => notFound(e.message === 'Product not found' ? '' : e.message));
   </script>
 </body>

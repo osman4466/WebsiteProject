@@ -84,6 +84,7 @@
   const variantOf = (p, size, color) => (p.variants || []).find((v) => (v.size || '') === (size || '') && (v.color || '') === (color || '')) || null;
   const stockOf = (p, size, color) => (hasVariants(p) ? (variantOf(p, size, color) || { stock: 0 }).stock : p.stock);
   const priceOf = (p, size, color) => { const v = variantOf(p, size, color); return v && v.price > 0 ? v.price : unitPrice(p); };
+  const productUrl = (p) => (p.slug ? '/product/' + p.slug : '/product?id=' + encodeURIComponent(p.id));
   const imageOf = (p, color) => (p.colorImages || {})[color] || (p.images || [])[0] || '';
 
   function imgTag(src, alt, cls) {
@@ -97,7 +98,7 @@
     const media = p.images.length
       ? imgTag(p.images[0], p.name) + (p.images[1] ? imgTag(p.images[1], '', 'alt') : '')
       : `<div class="ph">${STAR('#0A0A0A', '#B08A3A')}</div>`;
-    return `<a class="product" href="/product?id=${encodeURIComponent(p.id)}">
+    return `<a class="product" href="${productUrl(p)}">
       <div class="product-media">${media}${tag}</div>
       <div class="product-name">${esc(p.name)}</div>
       ${label ? `<div class="product-cat">${esc(label)}</div>` : ''}
@@ -125,11 +126,12 @@
   }
 
   // ---------- page chrome ----------
-  let settings = null;
-  async function loadSettings() {
-    if (settings) return settings;
-    try { settings = await api('settings'); } catch { settings = { storeName: 'Janissary Wear', tagline: '', shippingInside: 70, shippingOutside: 130, freeShippingOver: 0 }; }
-    return settings;
+  const FALLBACK_SETTINGS = { storeName: 'Janissary Wear', tagline: '', shippingInside: 70, shippingOutside: 130, freeShippingOver: 0, tracking: {} };
+  let settingsPromise = null;
+  // one request per page, shared by everything that asks (menu, footer, tracking ...)
+  function loadSettings() {
+    if (!settingsPromise) settingsPromise = api('settings').catch(() => FALLBACK_SETTINGS);
+    return settingsPromise;
   }
 
   let ACTIVE = null; // set by the product page (slug of the main category)
@@ -265,6 +267,6 @@
     });
   }
 
-  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, hasVariants, variantOf, stockOf, priceOf, imageOf, imgTag, productCard, carousel, catTile, loadSettings, renderChrome, updateCartCount,
+  window.JW = { $, $$, esc, money, STAR, api, cart, toast, unitPrice, onSale, hasVariants, variantOf, stockOf, priceOf, imageOf, productUrl, imgTag, productCard, carousel, catTile, loadSettings, renderChrome, updateCartCount,
     loadCats, tops, kidsOf, bySlug, topOf, catPath, catUrl, setActive };
 })();
