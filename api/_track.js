@@ -1,7 +1,7 @@
 // Tracking engine used by /api/track (browser events) and /api/orders (Purchase).
 // Sends events from the server to Meta (Conversions API) and Google Analytics 4 (Measurement Protocol).
 const crypto = require('crypto');
-const { dbGet, dbSet, clean } = require('./_lib');
+const { dbGet, clean } = require('./_lib');
 
 const GRAPH_VERSION = 'v23.0';
 const EVENTS = ['PageView', 'ViewContent', 'ViewCategory', 'Search', 'AddToCart', 'InitiateCheckout', 'AddPaymentInfo', 'Purchase', 'Contact'];
@@ -143,15 +143,6 @@ async function sendGA(e, cfg, secrets, debug) {
   }
 }
 
-// ---------- short log shown in Admin > Tracking (orders, tests and errors only, to save database writes) ----------
-async function addLog(entry) {
-  try {
-    const log = (await dbGet('tracking_log', [])) || [];
-    log.unshift({ t: Date.now(), ...entry });
-    await dbSet('tracking_log', log.slice(0, 40));
-  } catch { /* the log must never break anything */ }
-}
-
 // ---------- main entry ----------
 // Sends one event to every server destination that is switched on. Never throws.
 async function forward(req, raw, opts = {}) {
@@ -163,13 +154,10 @@ async function forward(req, raw, opts = {}) {
     const meta = await sendMeta(e, req, cfg, secrets);
     const ga = e.name === 'Purchase' ? await sendGA(e, cfg, secrets, false) : { state: 'off' };
     const bad = meta.state === 'error' || ga.state === 'error';
-    if (e.name === 'Purchase' || bad) {
-      await addLog({ event: e.name, id: e.eventId, value: e.value, meta: meta.state + (meta.message ? ': ' + meta.message : ''), ga: ga.state + (ga.message ? ': ' + ga.message : '') });
-    }
     return { ok: !bad, meta, ga };
   } catch (ex) {
     return { ok: false, error: ex.message };
   }
 }
 
-module.exports = { getTracking, getSecrets, resetCache, publicConfig, sanitize, forward, sendMeta, sendGA, addLog };
+module.exports = { getTracking, getSecrets, resetCache, publicConfig, sanitize, forward, sendMeta, sendGA };

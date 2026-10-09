@@ -1,5 +1,5 @@
 // Admin > Tracking
-//   GET  /api/tracking            settings (tokens are never returned, only a hint), plus the recent log
+//   GET  /api/tracking            settings (tokens are never returned, only a hint)
 //   PUT  /api/tracking            save settings; a token field left empty keeps the saved token
 //   POST /api/tracking?test=1     send a test event to Meta and GA4 and report what they answered
 const { send, getQuery, getBody, dbGet, dbSet, requireAdmin, clean } = require('./_lib');
@@ -37,7 +37,6 @@ module.exports = async (req, res) => {
       return send(res, 200, {
         config: cfg,
         secrets: { metaToken: hint(s.metaToken, s.metaFromEnv), gaSecret: hint(s.gaSecret, s.gaFromEnv) },
-        log: (await dbGet('tracking_log', [])) || [],
       });
     }
 
@@ -75,7 +74,6 @@ module.exports = async (req, res) => {
       if (!cfg.gaId) out.ga = { state: 'off', message: 'GA4 Measurement ID is empty.' };
       else if (!secrets.gaSecret) out.ga = { state: 'off', message: 'GA4 API secret is not saved.' };
       else out.ga = await T.sendGA({ ...ev, name: 'Purchase' }, { ...cfg, gaEnabled: true, gaServer: true }, secrets, true);
-      await T.addLog({ event: 'TEST', id: ev.eventId, value: 100, meta: out.meta.state + (out.meta.message ? ': ' + out.meta.message : ''), ga: out.ga.state + (out.ga.message ? ': ' + out.ga.message : '') });
       return send(res, 200, out);
     }
 

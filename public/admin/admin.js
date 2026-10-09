@@ -936,8 +936,6 @@
       <input class="input" id="t-${id}" type="password" autocomplete="new-password" placeholder="${s.set ? 'Saved ' + esc(s.hint) + ' - type a new one to replace it' : 'Paste it here'}">
       ${s.fromEnv ? '<div class="hint">A value from the Vercel environment is being used and wins over this box.</div>'
         : s.set ? `<label class="hs-vis" style="margin-top:.4rem"><input type="checkbox" id="t-${clearId}"> Remove the saved one</label>` : ''}</div>`;
-    const logRows = r.log.map((l) => `<tr><td>${fmtDate(l.t)}</td><td><b>${esc(l.event)}</b><div class="muted">${esc(l.id || '')}</div></td><td>${l.value ? money(l.value) : ''}</td>
-      <td class="${/^error/.test(l.meta) ? 'form-error' : ''}">${esc(l.meta)}</td><td class="${/^error/.test(l.ga) ? 'form-error' : ''}">${esc(l.ga)}</td></tr>`).join('');
 
     view.innerHTML = `
       <div class="view-head"><div><h1>Tracking</h1><p>Meta Pixel, Conversions API, Google Analytics 4 and Search Console. Every event is sent once, with one shared id.</p></div></div>
@@ -963,10 +961,7 @@
           <button class="btn btn-ghost" id="t-test" type="button">Save and send a test</button></div>
         <div class="form-error" id="t-err" role="alert"></div>
         <div id="t-result" style="margin-top:.6rem"></div>
-      </form>
-      <div class="card"><h2>Recent purchases, tests and errors</h2>
-        ${r.log.length ? `<div class="table-wrap"><table class="t" style="min-width:640px"><thead><tr><th>When</th><th>Event</th><th>Value</th><th>Meta</th><th>GA4</th></tr></thead><tbody>${logRows}</tbody></table></div>`
-          : '<p class="muted">Nothing yet. Orders and test events will appear here.</p>'}</div>`;
+      </form>`;
 
     const val = (id) => $('#t-' + id).value;
     const on = (id) => $('#t-' + id).checked;

@@ -50,7 +50,7 @@
 
     if (cfg.metaBrowser && window.fbq) {
       const p = {};
-if (value) { p.currency = 'BDT'; p.value = value; }
+      if (value) { p.currency = 'BDT'; p.value = value; }
       if (items.length) {
         p.content_type = 'product'; p.content_ids = items.map((i) => i.id);
         p.contents = items.map((i) => ({ id: i.id, quantity: i.qty, item_price: i.price }));
