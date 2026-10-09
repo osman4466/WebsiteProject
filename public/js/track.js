@@ -49,8 +49,8 @@
     const value = ev.value != null ? ev.value : items.reduce((n, i) => n + i.price * i.qty, 0);
 
     if (cfg.metaBrowser && window.fbq) {
-      const p = { currency: 'BDT' };
-      if (value) p.value = value;
+      const p = {};
+if (value) { p.currency = 'BDT'; p.value = value; }
       if (items.length) {
         p.content_type = 'product'; p.content_ids = items.map((i) => i.id);
         p.contents = items.map((i) => ({ id: i.id, quantity: i.qty, item_price: i.price }));
