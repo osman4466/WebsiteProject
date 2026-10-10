@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     const base = siteBase(req, trk.siteUrl);
     const abs = (u) => (!u ? '' : /^https?:\/\//i.test(u) ? u : base + (u.startsWith('/') ? '' : '/') + u);
     const site = settings.storeName || 'Janissary Wear';
-    const m = { site, gsc: trk.gscCode, url: base + '/', title: site, description: settings.tagline || '' };
+    const m = { site, gsc: trk.gscCode, url: base + '/', title: site, description: settings.tagline || '', image: base + '/img/share.jpg' };
     let status = 200, extra = '', body = '';
 
     if (name === 'index') {
@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
       m.description = "Men's and women's streetwear drawn from the Janissary orders: tees, polos and drop shoulders. Cash on delivery across Bangladesh.";
       const sameAs = [settings.facebook, settings.instagram].filter(Boolean);
       m.ld = [
-        { '@context': 'https://schema.org', '@type': 'Organization', name: site, url: base + '/', ...(sameAs.length ? { sameAs } : {}), ...(settings.phone ? { contactPoint: { '@type': 'ContactPoint', telephone: settings.phone, contactType: 'customer service' } } : {}) },
+        { '@context': 'https://schema.org', '@type': 'Organization', name: site, url: base + '/', logo: base + '/img/logo.png', ...(sameAs.length ? { sameAs } : {}), ...(settings.phone ? { contactPoint: { '@type': 'ContactPoint', telephone: settings.phone, contactType: 'customer service' } } : {}) },
         { '@context': 'https://schema.org', '@type': 'WebSite', name: site, url: base + '/' },
       ];
     } else if (name === 'products') {
@@ -89,7 +89,7 @@ module.exports = async (req, res) => {
         m.url = `${base}/product/${slug}`;
         m.title = `${p.name} | ${site}`;
         m.description = cut(p.description, 155) || `Buy ${p.name} for ৳${range.low.toLocaleString('en-IN')} from ${site}. Cash on delivery across Bangladesh.`;
-        m.image = abs((p.images || [])[0]);
+        m.image = abs((p.images || [])[0]) || m.image;
         m.ogType = 'product';
         const inStock = p.stock > 0;
         const crumbs = [{ name: 'Home', url: base + '/' }];
