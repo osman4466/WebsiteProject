@@ -224,7 +224,7 @@
           <div><h4>Shop</h4><ul id="footShop"></ul></div>
           <div><h4>Contact</h4><ul class="footer-contact"></ul></div>
         </div>
-        <div class="footer-bottom">© <span class="year"></span> <span class="store-name">Janissary Wear</span>. All rights reserved.</div>
+        <div class="footer-bottom">© <span class="year"></span> <span class="store-name">Janissary Wear</span>. All rights reserved.  · <a href="/returns">Return policy</a> · <a href="/privacy">Privacy policy</a></div>
       </div></footer>`;
       $('.year', bottom).textContent = new Date().getFullYear();
     }

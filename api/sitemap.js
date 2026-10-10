@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
     const base = siteBase(req, trk.siteUrl);
     const [products, cats] = await Promise.all([getProducts(), getCategories()]);
     const urls = [
-      { loc: base + '/' }, { loc: base + '/products' }, { loc: base + '/categories' },
+      { loc: base + '/' }, { loc: base + '/products' }, { loc: base + '/categories' }, { loc: base + '/returns' }, { loc: base + '/privacy' },
       ...cats.map((c) => ({ loc: `${base}/products?category=${encodeURIComponent(c.slug)}` })),
       ...products.filter((p) => p.active !== false).map((p) => ({ loc: `${base}/product/${productSlug(p)}`, lastmod: new Date(p.updatedAt || p.createdAt || Date.now()).toISOString().slice(0, 10) })),
     ];
