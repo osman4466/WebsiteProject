@@ -54,7 +54,7 @@
         <div class="cart-layout">
           <div id="items">${ls.map((l, i) => `
             <div class="cart-row">
-              <a class="cart-thumb" href="${JW.productUrl(l.p)}">${JW.imageOf(l.p, l.color) ? `<img src="${JW.esc(JW.imageOf(l.p, l.color))}" alt="">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
+              <a class="cart-thumb" href="${JW.productUrl(l.p)}">${JW.imageOf(l.p, l.color) ? `<img src="${JW.esc(JW.imageOf(l.p, l.color))}" alt="${JW.esc(l.p.name + (l.color ? ' – ' + l.color : ''))}">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</a>
               <div>
                 <a href="${JW.productUrl(l.p)}" style="font-weight:600">${JW.esc(l.p.name)}</a>
                 <div class="cart-meta">${[l.size && 'Size ' + JW.esc(l.size), l.color && JW.esc(l.color)].filter(Boolean).join(', ') || '&nbsp;'}</div>

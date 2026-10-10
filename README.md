@@ -25,6 +25,7 @@ janissary-wear/
 │   └── js/            app.js, track.js (Pixel ও GA4 ইভেন্ট)
 ├── api/               ব্যাকএন্ড (Vercel serverless functions)
 │   ├── page.js        পেজে SEO ট্যাগ বসিয়ে পাঠায়;  sitemap.js  robots.js
+│   ├── _pdp.js        পণ্যপেজের লেখা সার্ভারে তৈরি করে (নাম, দাম, বিবরণ, ছবির alt)
 │   ├── track.js  tracking.js  _track.js   Meta Conversions API ও GA4
 │   ├── login.js  products.js  categories.js  orders.js  image.js  settings.js  home.js  media.js  backup.js
 │   └── _lib.js        ডাটাবেস + লগইন সিকিউরিটি

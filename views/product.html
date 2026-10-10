@@ -12,9 +12,7 @@
 </head>
 <body>
   <div id="chrome-top"></div>
-  <main class="wrap" id="root">
-    <div class="pdp"><div class="skeleton" style="aspect-ratio:4/5"></div><div class="skeleton" style="height:420px"></div></div>
-  </main>
+  <main class="wrap" id="root"><!--PRODUCT--></main>
   <div id="chrome-bottom"></div>
 
   <script src="/js/app.js"></script>
@@ -22,13 +20,9 @@
   <script>
     JW.renderChrome();
     const root = document.getElementById('root');
-    const id = window.__PID__ || '';
+    const p = window.__P__;
     let settings = {};
-    document.addEventListener('jw:settings', (e) => { settings = e.detail; if (window.__p) renderWA(); });
-
-    function notFound(msg) {
-      root.innerHTML = `<div class="empty" style="margin:3rem 0 4.5rem"><h3>${JW.esc(msg || 'Product not found')}</h3><p>It may have been removed or is no longer available.</p><a class="btn btn-dark" href="/products">See all products</a></div>`;
-    }
+    document.addEventListener('jw:settings', (e) => { settings = e.detail; if (p) renderWA(); });
 
     // the size and color the customer has chosen right now
     function chosen() {
@@ -37,7 +31,6 @@
     }
 
     function renderWA() {
-      const p = window.__p;
       const box = document.getElementById('waFloat');
       if (!box || !settings.whatsapp) return;
       const c = chosen();
@@ -48,53 +41,7 @@
       box.hidden = false;
     }
 
-    function optGroup(name, label, values) {
-      if (!values.length) return '';
-      return `<div class="opt"><div class="opt-label" id="lbl-${name}">${label}</div><div class="opt-list" role="radiogroup" aria-labelledby="lbl-${name}">` +
-        values.map((v, i) => `<input type="radio" name="${name}" id="${name}-${i}" value="${JW.esc(v)}"${i === 0 ? ' checked' : ''}><label for="${name}-${i}">${JW.esc(v)}</label>`).join('') +
-        `</div></div>`;
-    }
-
-    Promise.all([JW.api('products?id=' + encodeURIComponent(id || '')), JW.loadCats()]).then(([p, cats]) => {
-      window.__p = p;
-      const cat = JW.bySlug(p.category, cats);
-      const parent = cat && cat.parent ? JW.bySlug(cat.parent, cats) : null;
-      JW.setActive(p.category);
-      document.title = p.name + ' | Janissary Wear';
-      const imgs = p.images.length ? p.images : [];
-
-      root.innerHTML = `
-        <div class="crumbs" style="padding-top:1.6rem"><a href="/">Home</a> / ${parent ? `<a href="${JW.catUrl(parent.slug)}">${JW.esc(parent.name)}</a> / ` : ''}${cat ? `<a href="${JW.catUrl(cat.slug)}">${JW.esc(cat.name)}</a> / ` : ''}${JW.esc(p.name)}</div>
-        <div class="pdp" style="padding-top:1rem">
-          <div>
-            <div class="gallery-main" id="main">${imgs.length ? `<img src="${JW.esc(imgs[0])}" alt="${JW.esc(p.name)}">` : `<div class="ph">${JW.STAR('#0A0A0A', '#B08A3A')}</div>`}</div>
-            ${imgs.length > 1 ? `<div class="thumbs">${imgs.map((s, i) => `<button class="thumb${i === 0 ? ' active' : ''}" data-src="${JW.esc(s)}" aria-label="Show photo ${i + 1}"><img src="${JW.esc(s)}" alt=""></button>`).join('')}</div>` : ''}
-          </div>
-          <div class="pdp-info">
-            ${cat ? `<a class="product-cat" href="${JW.catUrl(cat.slug)}">${JW.esc(JW.catPath(cat.slug, cats))}</a>` : ''}
-            <h1>${JW.esc(p.name)}</h1>
-            <div class="pdp-price" id="price"></div>
-            ${p.description ? `<p class="pdp-desc">${JW.esc(p.description)}</p>` : ''}
-            ${optGroup('size', 'Size', p.sizes || [])}
-            ${optGroup('color', 'Color', p.colors || [])}
-            <div class="buy-row">
-              <div class="qty" aria-label="Quantity">
-                <button type="button" id="minus" aria-label="Decrease quantity">&minus;</button>
-                <input id="qty" type="number" min="1" max="20" value="1" aria-label="Quantity">
-                <button type="button" id="plus" aria-label="Increase quantity">+</button>
-              </div>
-              <button class="btn btn-ghost" id="add" style="flex:1">Add to cart</button>
-              <button class="btn btn-primary" id="buy" style="flex:1">Buy now</button>
-            </div>
-            <div class="stock-note" id="stockNote"></div>
-            <div class="facts">
-              <div><span>Delivery inside Dhaka</span><span class="d-in">-</span></div>
-              <div><span>Delivery outside Dhaka</span><span class="d-out">-</span></div>
-              <div><span>Payment</span><span>Cash on delivery</span></div>
-            </div>
-          </div>
-        </div>`;
-
+    if (p) {
       document.body.classList.add('has-buy-bar');
       const qty = document.getElementById('qty');
       const maxQty = () => { const c = chosen(); return Math.min(20, Math.max(1, JW.stockOf(p, c.size, c.color))); };
@@ -104,7 +51,9 @@
       qty.onchange = clamp;
 
       root.querySelectorAll('.thumb').forEach((t) => t.addEventListener('click', () => {
-        document.querySelector('#main img').src = t.dataset.src;
+        const main = document.querySelector('#main img');
+        main.src = t.dataset.src;
+        main.alt = t.querySelector('img').alt;
         root.querySelectorAll('.thumb').forEach((x) => x.classList.toggle('active', x === t));
       }));
 
@@ -113,8 +62,9 @@
         const u = (p.colorImages || {})[color];
         if (!u) return;
         const main = document.querySelector('#main img');
-        if (main) main.src = u;
-        else document.getElementById('main').innerHTML = `<img src="${JW.esc(u)}" alt="${JW.esc(p.name)}">`;
+        const alt = `${p.name} – ${color}`;
+        if (main) { main.src = u; main.alt = alt; }
+        else document.getElementById('main').innerHTML = `<img src="${JW.esc(u)}" alt="${JW.esc(alt)}">`;
         root.querySelectorAll('.thumb').forEach((x) => x.classList.toggle('active', x.dataset.src === u));
       }
 
@@ -153,17 +103,13 @@
         location.href = '/cart';
       };
 
-      const fill = (s) => {
-        const a = root.querySelector('.d-in'), b = root.querySelector('.d-out');
-        if (a) a.textContent = JW.money(s.shippingInside);
-        if (b) b.textContent = JW.money(s.shippingOutside);
-      };
-      if (settings.storeName) fill(settings);
-      document.addEventListener('jw:settings', (e) => fill(e.detail));
       refresh();
       const first = chosen();
-      JW.track('ViewContent', { items: [JW.trackItem(p, first.size, first.color, 1)], category: JW.catPath(p.category, cats) });
-    }).catch((e) => notFound(e.message === 'Product not found' ? '' : e.message));
+      JW.loadCats().catch(() => []).then((cats) => {
+        JW.setActive(p.category);
+        JW.track('ViewContent', { items: [JW.trackItem(p, first.size, first.color, 1)], category: JW.catPath(p.category, cats) });
+      });
+    }
   </script>
 </body>
 </html>

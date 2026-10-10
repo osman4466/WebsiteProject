@@ -3,8 +3,9 @@
 // The page templates live in /views; the page itself still builds its content in the browser.
 const fs = require('fs');
 const path = require('path');
-const { getQuery, getSettings, getCategories, getProducts, findBySlug, productSlug, siteBase } = require('./_lib');
+const { getQuery, getSettings, getCategories, getProducts, findBySlug, productSlug, withSlug, siteBase } = require('./_lib');
 const { getTracking } = require('./_track');
+const { renderProduct, renderNotFound, priceRange } = require('./_pdp');
 
 const FILES = { index: 'index.html', products: 'products.html', product: 'product.html', cart: 'cart.html', categories: 'categories.html' };
 const templates = {};
@@ -13,7 +14,6 @@ const template = (name) => templates[name] || (templates[name] = fs.readFileSync
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ld = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
 const cut = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).trim() + '…' : s; };
-const unit = (p) => (p.salePrice > 0 && p.salePrice < p.price ? p.salePrice : p.price);
 
 function head(m) {
   const t = esc(m.title), d = esc(m.description);
@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
     const abs = (u) => (!u ? '' : /^https?:\/\//i.test(u) ? u : base + (u.startsWith('/') ? '' : '/') + u);
     const site = settings.storeName || 'Janissary Wear';
     const m = { site, gsc: trk.gscCode, url: base + '/', title: site, description: settings.tagline || '' };
-    let status = 200, extra = '';
+    let status = 200, extra = '', body = '';
 
     if (name === 'index') {
       m.title = `${site} | ${settings.tagline || 'Streetwear'}`;
@@ -79,15 +79,16 @@ module.exports = async (req, res) => {
       const p = findBySlug(products.filter((x) => x.active !== false), q.slug || q.id);
       if (!p) {
         status = 404; m.title = `Product not found | ${site}`; m.description = 'This product is no longer available.'; m.noindex = true; m.url = base + '/products';
+        body = renderNotFound();
       } else {
         const slug = productSlug(p);
         // old links (/product?id=...) and renamed products go to the current address
         if (q.slug !== slug) { res.statusCode = 301; res.setHeader('Location', '/product/' + slug); return res.end(); }
         const cat = cats.find((c) => c.slug === p.category);
-        const price = unit(p);
+        const range = priceRange(p);
         m.url = `${base}/product/${slug}`;
         m.title = `${p.name} | ${site}`;
-        m.description = cut(p.description, 155) || `Buy ${p.name} for ৳${price.toLocaleString('en-IN')} from ${site}. Cash on delivery across Bangladesh.`;
+        m.description = cut(p.description, 155) || `Buy ${p.name} for ৳${range.low.toLocaleString('en-IN')} from ${site}. Cash on delivery across Bangladesh.`;
         m.image = abs((p.images || [])[0]);
         m.ogType = 'product';
         const inStock = p.stock > 0;
@@ -97,14 +98,15 @@ module.exports = async (req, res) => {
         crumbs.push({ name: p.name, url: m.url });
         m.ld = [
           { '@context': 'https://schema.org', '@type': 'Product', name: p.name, description: cut(p.description, 500) || p.name, sku: p.id, ...((p.images || []).length ? { image: p.images.map(abs) } : {}), brand: { '@type': 'Brand', name: site },
-            offers: { '@type': 'Offer', url: m.url, priceCurrency: 'BDT', price: String(price), availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' } },
+            offers: { ...(range.low === range.high ? { '@type': 'Offer', price: String(range.low) } : { '@type': 'AggregateOffer', lowPrice: String(range.low), highPrice: String(range.high) }), url: m.url, priceCurrency: 'BDT', availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' } },
           { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.url })) },
         ];
-        extra = `<script>window.__PID__=${JSON.stringify(p.id).replace(/</g, '\\u003c')};</script>`;
+        body = renderProduct(p, { cats, settings });
+        extra = `<script>window.__P__=${JSON.stringify(withSlug(p)).replace(/</g, '\\u003c')};</script>`;
       }
     }
 
-    const html = template(name).replace('<!--SEO-->', head(m) + (extra ? '\n  ' + extra : ''));
+    const html = template(name).replace('<!--SEO-->', () => head(m) + (extra ? '\n  ' + extra : '')).replace('<!--PRODUCT-->', () => body);
     res.statusCode = status;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', status === 200 ? 'public, s-maxage=60, stale-while-revalidate=300' : 'no-store');
