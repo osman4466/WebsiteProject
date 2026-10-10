@@ -219,8 +219,8 @@ body.no-scroll { overflow: hidden; }
 .qty { display: inline-flex; border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--paper); }
 .qty button { width: 40px; border: 0; background: none; font-size: 1.2rem; }
 .qty button:hover { background: var(--tile); }
-.qty input { width: 44px; text-align: center; border: 0; background: none; font-weight: 600; -moz-appearance: textfield; }
-.qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty input { width: 44px; text-align: center; border: 0; background: none; font-weight: 600; appearance: textfield; -moz-appearance: textfield; }
+.qty input::-webkit-outer-spin-button, .qty input::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
 .stock-note { font-size: .92rem; color: var(--sale); font-weight: 600; margin-top: .8rem; }
 .facts { margin-top: 2rem; border-top: 1px solid var(--line); }
 .facts div { display: flex; justify-content: space-between; gap: 16px; padding: .8rem 0; border-bottom: 1px solid var(--line); font-size: .95rem; }
