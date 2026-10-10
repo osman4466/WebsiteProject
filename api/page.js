@@ -92,13 +92,16 @@ module.exports = async (req, res) => {
         m.image = abs((p.images || [])[0]) || m.image;
         m.ogType = 'product';
         const inStock = p.stock > 0;
+        const bd = { '@type': 'DefinedRegion', addressCountry: 'BD' };
+const ship = (value, region) => ({ '@type': 'OfferShippingDetails', shippingRate: { '@type': 'MonetaryAmount', value: String(value), currency: 'BDT' }, shippingDestination: { ...bd, ...(region ? { addressRegion: region } : {}) } });
+const shippingDetails = [ship(settings.shippingInside, 'Dhaka'), ship(settings.shippingOutside)];
         const crumbs = [{ name: 'Home', url: base + '/' }];
         if (cat && cat.parent) { const par = cats.find((c) => c.slug === cat.parent); if (par) crumbs.push({ name: par.name, url: `${base}/products?category=${par.slug}` }); }
         if (cat) crumbs.push({ name: cat.name, url: `${base}/products?category=${cat.slug}` });
         crumbs.push({ name: p.name, url: m.url });
         m.ld = [
           { '@context': 'https://schema.org', '@type': 'Product', name: p.name, description: cut(p.description, 500) || p.name, sku: p.id, ...((p.images || []).length ? { image: p.images.map(abs) } : {}), brand: { '@type': 'Brand', name: site },
-            offers: { ...(range.low === range.high ? { '@type': 'Offer', price: String(range.low) } : { '@type': 'AggregateOffer', lowPrice: String(range.low), highPrice: String(range.high) }), url: m.url, priceCurrency: 'BDT', availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' } },
+            offers: { ...(range.low === range.high ? { '@type': 'Offer', price: String(range.low) } : { '@type': 'AggregateOffer', lowPrice: String(range.low), highPrice: String(range.high) }), url: m.url, priceCurrency: 'BDT', availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition', shippingDetails, hasMerchantReturnPolicy: { '@type': 'MerchantReturnPolicy', applicableCountry: 'BD', returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow', merchantReturnDays: 3, returnMethod: 'https://schema.org/ReturnByMail', returnFees: 'https://schema.org/ReturnShippingFees' } } },
           { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.url })) },
         ];
         body = renderProduct(p, { cats, settings });
