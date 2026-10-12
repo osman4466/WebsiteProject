@@ -28,14 +28,14 @@ const SHOW = 10, MIN_SAME = 4;
 const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const catUrl = (c) => '/products?category=' + encodeURIComponent(c.slug);
 
-// same card as JW.productCard in public/js/app.js (these are never sold out, so there is no "Sold out" tag)
+// like JW.productCard in public/js/app.js, but never sold out and without the second (hover) photo
 function card(p, cats) {
   const c = cats.find((x) => x.slug === p.category);
   const par = c && c.parent ? cats.find((x) => x.slug === c.parent) : null;
   const label = c ? (par ? par.name + ' / ' : '') + c.name : '';
   const sale = p.salePrice > 0 && p.salePrice < p.price;
-  const img = (src, alt, cls) => `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"${cls ? ` class="${cls}"` : ''}>`;
-  const media = (p.images || []).length ? img(p.images[0], p.name) + (p.images[1] ? img(p.images[1], '', 'alt') : '') : `<div class="ph">${STAR}</div>`;
+    // the photo gets its src from views/product.html only when it comes near the screen, so these rows never slow down the main photo
+  const media = (p.images || []).length ? `<img data-src="${esc(p.images[0])}" alt="${esc(p.name)}">` : `<div class="ph">${STAR}</div>`;
   return `<a class="product" href="/product/${productSlug(p)}">
           <div class="product-media">${media}${sale ? `<span class="tag">Save ${Math.round((1 - p.salePrice / p.price) * 100)}%</span>` : ''}</div>
           <div class="product-name">${esc(p.name)}</div>

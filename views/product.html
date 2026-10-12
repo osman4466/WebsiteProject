@@ -103,6 +103,13 @@
         location.href = '/cart';
       };
 
+            // photos in the suggestion rows load only when they come near the screen
+      const late = root.querySelectorAll('img[data-src]');
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((list) => list.forEach((en) => { if (en.isIntersecting) { en.target.src = en.target.dataset.src; io.unobserve(en.target); } }), { rootMargin: '300px' });
+        late.forEach((i) => io.observe(i));
+      } else late.forEach((i) => { i.src = i.dataset.src; });
+
       refresh();
       const first = chosen();
       JW.loadCats().catch(() => []).then((cats) => {

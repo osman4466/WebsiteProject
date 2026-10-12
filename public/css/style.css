@@ -146,6 +146,7 @@ body.no-scroll { overflow: hidden; }
 .product-media { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--tile); border-radius: var(--radius); }
 .product-media img { width: 100%; height: 100%; object-fit: cover; transition: opacity .25s; }
 .product-media img.alt { position: absolute; inset: 0; opacity: 0; }
+.product-media img:not([src]) { visibility: hidden; }
 .product:hover .product-media img.alt { opacity: 1; }
 .ph {
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
