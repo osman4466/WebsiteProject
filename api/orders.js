@@ -4,6 +4,7 @@ const {
 } = require('./_lib');
 const { forward } = require('./_track');
 const { notifyOrder } = require('./_mail');
+const { trackOrders } = require('./_status');
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
@@ -26,6 +27,7 @@ module.exports = async (req, res) => {
     // ---- Public: place an order (cash on delivery) ----
     if (req.method === 'POST') {
       const b = await getBody(req);
+      if (q.track) return trackOrders(req, res, b);   // a customer looking up an order
       const c = b.customer || {};
       const customer = {
         name: clean(c.name, 80),
@@ -76,6 +78,7 @@ module.exports = async (req, res) => {
         items, subtotal, shipping, total: subtotal + shipping,
         customer, status: 'pending', createdAt: Date.now(),
       };
+            order.history = [{ status: 'pending', at: order.createdAt }];
       orders.unshift(order);
       await dbSet('orders', orders.slice(0, 2000));
       // after the order is saved: tell Meta and Google about the purchase (the browser sends the same event with the same id, so it is counted once)
@@ -123,6 +126,7 @@ module.exports = async (req, res) => {
         }
         await dbSet('products', products);
       }
+            if (b.status !== prev) orders[i].history = [...(orders[i].history || []), { status: b.status, at: Date.now() }];
       orders[i].status = b.status;
       await dbSet('orders', orders);
       return send(res, 200, orders[i]);

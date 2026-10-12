@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Track your order | Janissary Wear</title>
+  <meta name="description" content="Track your Janissary Wear order with your mobile number or order number.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="chrome-top"></div>
+  <main>
+    <div class="page-head"><div class="wrap">
+      <div class="crumbs"><a href="/">Home</a> / Track your order</div>
+      <h1 style="font-size:clamp(2.2rem,5vw,3.6rem)">Track your order</h1>
+      <p>Enter your mobile number or your order number.</p>
+    </div></div>
+    <div class="wrap trk">
+      <form id="tf" novalidate>
+        <div class="field"><label for="t-phone">Mobile number</label><input class="input" id="t-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="01XXXXXXXXX"></div>
+        <div class="trk-or">or</div>
+        <div class="field"><label for="t-num">Order number</label><input class="input" id="t-num" autocomplete="off" autocapitalize="characters" placeholder="JW-XXXXXX"></div>
+        <button class="btn btn-dark btn-block" id="t-go" type="submit">Track order</button>
+        <div class="form-error" id="t-err" role="alert"></div>
+      </form>
+      <div id="t-out" aria-live="polite"></div>
+    </div>
+  </main>
+  <div id="chrome-bottom"></div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/track.js"></script>
+  <script>
+    JW.renderChrome();
+    const STEPS = [['pending', 'Order placed'], ['confirmed', 'Confirmed'], ['shipped', 'On the way'], ['delivered', 'Delivered']];
+    const day = (t, year) => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) });
+    const optionOf = (i) => [i.size && 'Size ' + i.size, i.color].filter(Boolean).join(', ');
+    let contact = '';
+    document.addEventListener('jw:settings', (e) => { contact = e.detail.whatsapp ? `https://wa.me/${e.detail.whatsapp}` : e.detail.phone ? `tel:${e.detail.phone}` : ''; });
+
+    function card(o) {
+      const at = (s) => { const h = o.history.filter((x) => x.status === s).pop(); return h ? h.at : s === 'pending' ? o.createdAt : 0; };
+      const now = STEPS.findIndex((s) => s[0] === o.status);
+      const progress = o.status === 'cancelled'
+        ? `<p class="trk-cancel">This order was cancelled${at('cancelled') ? ' on ' + day(at('cancelled')) : ''}.</p>`
+        : `<ol class="trk-steps">${STEPS.map(([s, label], k) => `<li class="${k < now ? 'done' : k === now ? 'now' : ''}"><span>${label}</span>${k <= now && at(s) ? `<small>${day(at(s))}</small>` : ''}</li>`).join('')}</ol>`;
+      return `<article class="trk-card">
+        <div class="trk-top"><div><b>${JW.esc(o.number)}</b><small>Placed ${day(o.createdAt, true)}</small></div><span class="trk-badge ${o.status}">${o.status === 'cancelled' ? 'Cancelled' : STEPS[now][1]}</span></div>
+        ${progress}
+        <div class="trk-items">${o.items.map((i) => `<div class="trk-item">${i.image ? `<img src="${JW.esc(i.image)}" alt="${JW.esc(i.name)}" loading="lazy">` : '<span></span>'}<div><b>${JW.esc(i.name)}</b><small>${JW.esc(optionOf(i))}${optionOf(i) ? ' · ' : ''}Qty ${i.qty}</small></div><span>${JW.money(i.price * i.qty)}</span></div>`).join('')}</div>
+        <div class="sum-box">
+          <div class="sum-line"><span>Products</span><span>${JW.money(o.subtotal)}</span></div>
+          <div class="sum-line"><span>Delivery</span><span>${o.shipping ? JW.money(o.shipping) : 'Free'}</span></div>
+          <div class="sum-total"><span>Total</span><span>${JW.money(o.total)}</span></div>
+        </div>
+      </article>`;
+    }
+
+    document.getElementById('tf').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('t-err'), out = document.getElementById('t-out'), btn = document.getElementById('t-go');
+      err.textContent = ''; out.innerHTML = '';
+      btn.disabled = true; btn.textContent = 'Checking...';
+      try {
+        const r = await JW.api('orders?track=1', { method: 'POST', body: { phone: document.getElementById('t-phone').value, number: document.getElementById('t-num').value } });
+        out.innerHTML = r.orders.length ? r.orders.map(card).join('')
+          : `<div class="empty"><h3>Order not found</h3><p>We could not find a running order with these details. Orders delivered more than 2 days ago are no longer shown.</p>${contact ? `<a class="btn btn-dark" href="${JW.esc(contact)}">Contact us</a>` : ''}</div>`;
+      } catch (ex) { err.textContent = ex.message; }
+      btn.disabled = false; btn.textContent = 'Track order';
+    });
+  </script>
+</body>
+</html>

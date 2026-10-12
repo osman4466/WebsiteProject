@@ -173,12 +173,12 @@
             ? `<details${t.slug === key ? ' open' : ''}><summary>${esc(t.name)}</summary><a href="${catUrl(t.slug)}">All ${esc(t.name)}</a>${kids.map((k) => `<a href="${catUrl(k.slug)}">${esc(k.name)}</a>`).join('')}</details>`
             : `<a href="${catUrl(t.slug)}"${cls(t.slug)}>${esc(t.name)}</a>`;
         }).join('') +
-        `<a href="/products"${cls('products')}>All products</a><a href="/cart">Your cart</a>`;
+        `<a href="/products"${cls('products')}>All products</a><a href="/cart">Your cart</a><a href="/track-order">Track order</a>`;
     }
     const shop = $('#footShop');
     if (shop) {
       shop.innerHTML = tops().map((t) => `<li><a href="${catUrl(t.slug)}">${esc(t.name)}</a></li>`).join('') +
-        '<li><a href="/products">All products</a></li><li><a href="/categories">All categories</a></li><li><a href="/cart">Your cart</a></li>';
+        '<li><a href="/products">All products</a></li><li><a href="/categories">All categories</a></li><li><a href="/cart">Your cart</a></li><li><a href="/track-order">Track your order</a></li>';
     }
   }
 
@@ -192,10 +192,13 @@
         <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="drawer"><span></span><span></span><span></span></button>
         <a class="brand" href="/" aria-label="Home">${STAR()}<span class="store-name">Janissary Wear</span></a>
         <nav class="nav" id="mainNav" aria-label="Main"></nav>
-        <a class="cart-link" href="/cart" aria-label="Cart">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
-          <span class="cart-count" data-n="0">0</span>
-        </a>
+                <div class="head-tools">
+          <a class="track-link" href="/track-order">Track order</a>
+          <a class="cart-link" href="/cart" aria-label="Cart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
+            <span class="cart-count" data-n="0">0</span>
+          </a>
+        </div>
       </div></header>
       <div class="drawer-bg" id="drawerBg" hidden></div>
       <aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true">

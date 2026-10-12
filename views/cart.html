@@ -159,7 +159,7 @@
             <div class="sum-total"><span>Total</span><span>${JW.money(r.total)}</span></div>
           </div>
           <p>Please keep <b>${JW.money(r.total)}</b> ready for the delivery person.</p>
-          <a class="btn btn-dark" href="/products">Continue shopping</a></div>`;
+          <a class="btn btn-dark" href="/products">Continue shopping</a><a class="btn btn-ghost" href="/track-order">Track your order</a></div>`;
         window.scrollTo({ top: 0 });
       } catch (ex) {
         err.textContent = ex.message;
