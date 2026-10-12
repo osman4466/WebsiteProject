@@ -1014,7 +1014,9 @@
         <div class="hint" style="margin:-.6rem 0 1rem">Set "Free delivery over" to 0 to charge delivery on every order.</div>
         <button class="btn btn-primary" id="s-save" type="submit">Save settings</button>
         <div class="form-error" id="s-err" role="alert"></div>
-      </form>`;
+      </form>
+      <form class="card" id="nf" novalidate style="max-width:760px;margin-top:1rem"><p class="muted">Loading...</p></form>`;
+    orderEmail();
 
     $('#sf').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1029,6 +1031,46 @@
       try { S.settings = await A('settings', { method: 'PUT', body }); updateChrome(); toast('Settings saved'); }
       catch (ex) { $('#s-err').textContent = ex.message; }
       btn.disabled = false; btn.textContent = 'Save settings';
+    });
+  }
+
+  // an email to the owner for every new order (sent with Resend)
+  async function orderEmail() {
+    const box = $('#nf');
+    let r;
+    try { r = await A('notify'); } catch (e) { box.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; return; }
+    box.innerHTML = `
+      <h2>Order email</h2>
+      <p class="muted" style="margin:-.2rem 0 1rem">Get an email with the products, photos and customer details every time an order comes in. Sent with Resend (resend.com), free for up to 100 emails a day.</p>
+      <label class="hs-vis" style="margin-bottom:1rem"><input type="checkbox" id="n-enabled"${r.enabled ? ' checked' : ''}> Send an email for every new order</label>
+      <div class="field"><label for="n-to">Send to</label><input class="input" id="n-to" type="email" value="${esc(r.to)}" placeholder="you@gmail.com" autocomplete="off"></div>
+      <div class="hint" style="margin:-.6rem 0 1rem">Until you add your own domain in Resend, this must be the same email the Resend account was opened with.</div>
+      <div class="field"><label for="n-key">Resend API key</label>
+        <input class="input" id="n-key" type="password" autocomplete="new-password" placeholder="${r.key.set ? 'Saved ' + esc(r.key.hint) + ' - type a new one to replace it' : 'Starts with re_'}">
+        ${r.key.set ? '<label class="hs-vis" style="margin-top:.4rem"><input type="checkbox" id="n-clear"> Remove the saved key</label>' : ''}</div>
+      <div class="field"><label for="n-from">Sender address (optional)</label><input class="input" id="n-from" type="email" value="${esc(r.from)}" placeholder="${esc(r.defaultFrom)}" autocomplete="off"></div>
+      <div class="hint" style="margin:-.6rem 0 1rem">Leave empty for now. After you add your domain in Resend, put an address on that domain here, for example orders@yourdomain.com.</div>
+      <div class="hs-btns"><button class="btn btn-primary" id="n-save" type="submit">Save order email</button>
+        <button class="btn btn-ghost" id="n-test" type="button">Save and send a test</button></div>
+      <div class="form-error" id="n-err" role="alert"></div>
+      <div id="n-result" style="margin-top:.6rem"></div>`;
+
+    const save = () => A('notify', { method: 'PUT', body: {
+      enabled: $('#n-enabled').checked, to: $('#n-to').value, from: $('#n-from').value, apiKey: $('#n-key').value,
+      clearKey: !!($('#n-clear') && $('#n-clear').checked),
+    } });
+    box.addEventListener('submit', async (e) => {
+      e.preventDefault(); $('#n-err').textContent = ''; $('#n-result').innerHTML = '';
+      try { await save(); toast('Order email saved'); orderEmail(); } catch (ex) { $('#n-err').textContent = ex.message; }
+    });
+    $('#n-test').addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; $('#n-err').textContent = ''; $('#n-result').innerHTML = '<span class="muted">Sending...</span>';
+      try {
+        await save();
+        const t = await A('notify?test=1', { method: 'POST', body: {} });
+        $('#n-result').innerHTML = t.ok ? '<b>Sent.</b> Check your inbox (and the spam folder).' : `<span class="form-error"><b>Failed.</b> ${esc(t.error || '')}</span>`;
+      } catch (ex) { $('#n-err').textContent = ex.message; $('#n-result').innerHTML = ''; }
+      btn.disabled = false;
     });
   }
 

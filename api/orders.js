@@ -3,6 +3,7 @@ const {
   requireAdmin, uid, clean,
 } = require('./_lib');
 const { forward } = require('./_track');
+const { notifyOrder } = require('./_mail');
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
@@ -77,15 +78,19 @@ module.exports = async (req, res) => {
       };
       orders.unshift(order);
       await dbSet('orders', orders.slice(0, 2000));
-      // tell Meta and Google about the purchase from the server (the browser sends the same event with the same id, so it is counted once)
+      // after the order is saved: tell Meta and Google about the purchase (the browser sends the same event with the same id, so it is counted once)
+      // and email the owner. Both run together and neither can hold the customer for more than a few seconds.
       const t = b.tracking && typeof b.tracking === 'object' ? b.tracking : {};
       let timer;
       await Promise.race([
-        forward(req, {
-          name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
-          items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-          fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
-        }),
+        Promise.all([
+          forward(req, {
+            name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
+            items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+            fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
+          }),
+          notifyOrder(req, order, settings.storeName),
+        ]),
         new Promise((resolve) => { timer = setTimeout(resolve, 5000); }),
       ]);
       clearTimeout(timer);
