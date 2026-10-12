@@ -1,5 +1,6 @@
 // The product page content, built on the server so search engines and link previews read the real text
 // (name, price, description, photos). views/product.html only adds the buttons and the size/color behaviour.
+const { productSlug } = require('./_lib');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = (n) => '৳' + Number(n || 0).toLocaleString('en-IN');
 const STAR = '<svg viewBox="0 0 40 40" aria-hidden="true"><g fill="#0A0A0A"><rect x="9" y="9" width="22" height="22"/><rect x="9" y="9" width="22" height="22" transform="rotate(45 20 20)"/></g><circle cx="20" cy="20" r="4.2" fill="#B08A3A"/></svg>';
@@ -22,7 +23,57 @@ const optGroup = (name, label, values) => (!values.length ? '' :
   values.map((v, i) => `<input type="radio" name="${name}" id="${name}-${i}" value="${esc(v)}"${i === 0 ? ' checked' : ''}><label for="${name}-${i}">${esc(v)}</label>`).join('') +
   '</div></div>');
 
-function renderProduct(p, { cats, settings }) {
+  // ---------- suggestions under the product: more of the same category, then some from the other side (Men <-> Women) ----------
+const SHOW = 10, MIN_SAME = 4;
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const catUrl = (c) => '/products?category=' + encodeURIComponent(c.slug);
+
+// same card as JW.productCard in public/js/app.js (these are never sold out, so there is no "Sold out" tag)
+function card(p, cats) {
+  const c = cats.find((x) => x.slug === p.category);
+  const par = c && c.parent ? cats.find((x) => x.slug === c.parent) : null;
+  const label = c ? (par ? par.name + ' / ' : '') + c.name : '';
+  const sale = p.salePrice > 0 && p.salePrice < p.price;
+  const img = (src, alt, cls) => `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"${cls ? ` class="${cls}"` : ''}>`;
+  const media = (p.images || []).length ? img(p.images[0], p.name) + (p.images[1] ? img(p.images[1], '', 'alt') : '') : `<div class="ph">${STAR}</div>`;
+  return `<a class="product" href="/product/${productSlug(p)}">
+          <div class="product-media">${media}${sale ? `<span class="tag">Save ${Math.round((1 - p.salePrice / p.price) * 100)}%</span>` : ''}</div>
+          <div class="product-name">${esc(p.name)}</div>
+          ${label ? `<div class="product-cat">${esc(label)}</div>` : ''}
+          <div class="price"><span class="now${sale ? ' sale' : ''}">${money(unitPrice(p))}</span>${sale ? `<s>${money(p.price)}</s>` : ''}</div>
+        </a>`;
+}
+
+const row = (title, link, list, cats) => (!list.length ? '' : `
+        <section class="home-sec" aria-label="${esc(title)}">
+          <div class="section-head"><h2>${esc(title)}</h2><a class="link-more" href="${esc(link)}">View all</a></div>
+          <div class="carousel"><button class="car-btn prev" type="button" aria-label="Previous" data-dir="-1">&#8249;</button><div class="car-track">${list.map((p) => card(p, cats)).join('')}</div><button class="car-btn next" type="button" aria-label="Next" data-dir="1">&#8250;</button></div>
+        </section>`);
+
+function suggestions(p, products, cats) {
+  const live = products.filter((x) => x.id !== p.id && x.active !== false && x.stock > 0);   // sold out products are not shown
+  const cat = cats.find((c) => c.slug === p.category);
+  const top = cat ? (cat.parent ? cats.find((c) => c.slug === cat.parent) : cat) : null;
+  const topOf = (x) => { const c = cats.find((k) => k.slug === x.category); return c ? c.parent || c.slug : ''; };
+
+  // row 1: the same category; if it has too few products, fill up from the whole main category (Men or Women)
+  let same = live.filter((x) => x.category === p.category);
+  let first = { title: cat ? 'More from ' + (top && top !== cat ? top.name + ' ' : '') + cat.name : 'More products', link: cat ? catUrl(cat) : '/products' };
+  if (top && same.length < MIN_SAME) {
+    same = same.concat(live.filter((x) => x.category !== p.category && topOf(x) === top.slug));
+    first = { title: 'More from ' + top.name, link: catUrl(top) };
+  }
+  same = same.slice(0, SHOW);
+
+  // row 2: random products from the other side (Men page shows Women, Women page shows Men); any other category shows random products
+  const opposite = top && { men: 'women', women: 'men' }[top.slug];
+  const used = new Set(same.map((x) => x.id));
+  const pool = live.filter((x) => !used.has(x.id) && (opposite ? topOf(x) === opposite : topOf(x) !== (top ? top.slug : '')));
+  const other = opposite && cats.find((c) => c.slug === opposite);
+
+  return row(first.title, first.link, same, cats) + row('You may also like', other ? catUrl(other) : '/products', shuffle(pool).slice(0, SHOW), cats);
+}
+function renderProduct(p, { cats, settings, products = [] }) {
   const sizes = p.sizes || [], colors = p.colors || [];
   const size = sizes[0] || '', color = colors[0] || '';
   const cat = cats.find((c) => c.slug === p.category);
@@ -70,8 +121,8 @@ function renderProduct(p, { cats, settings }) {
               <div><span>Delivery outside Dhaka</span><span>${money(settings.shippingOutside)}</span></div>
               <div><span>Payment</span><span>Cash on delivery</span></div>
             </div>
-          </div>
-        </div>`;
+                    </div>
+        </div>${suggestions(p, products, cats)}`;
 }
 
 const renderNotFound = () => '<div class="empty" style="margin:3rem 0 4.5rem"><h3>Product not found</h3><p>It may have been removed or is no longer available.</p><a class="btn btn-dark" href="/products">See all products</a></div>';

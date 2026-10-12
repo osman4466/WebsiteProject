@@ -104,7 +104,7 @@ const shippingDetails = [ship(settings.shippingInside, 'Dhaka'), ship(settings.s
             offers: { ...(range.low === range.high ? { '@type': 'Offer', price: String(range.low) } : { '@type': 'AggregateOffer', lowPrice: String(range.low), highPrice: String(range.high) }), url: m.url, priceCurrency: 'BDT', availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition', shippingDetails, hasMerchantReturnPolicy: { '@type': 'MerchantReturnPolicy', applicableCountry: 'BD', returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow', merchantReturnDays: 3, merchantReturnLink: base + '/returns', returnMethod: 'https://schema.org/ReturnByMail', returnFees: 'https://schema.org/ReturnShippingFees' } } },
           { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.url })) },
         ];
-        body = renderProduct(p, { cats, settings });
+        body = renderProduct(p, { cats, settings, products });
         extra = `<script>window.__P__=${JSON.stringify(withSlug(p)).replace(/</g, '\\u003c')};</script>`;
       }
     }
