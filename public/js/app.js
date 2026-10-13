@@ -187,7 +187,7 @@
     const bottom = $('#chrome-bottom');
     if (top) {
       top.innerHTML = `
-      <div class="announce on-dark" id="announce" hidden></div>
+      <div class="announce on-dark" id="announce"${window.__ANN__ ? '' : ' hidden'}>${esc(window.__ANN__ || '')}</div>
       <header class="site-header"><div class="wrap">
         <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="drawer"><span></span><span></span><span></span></button>
         <a class="brand" href="/" aria-label="Home">${STAR()}<span class="store-name">Janissary Wear</span></a>

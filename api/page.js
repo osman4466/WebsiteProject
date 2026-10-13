@@ -1,11 +1,12 @@
 // Serves the storefront pages with the SEO tags already in the HTML
 // (title, description, canonical, share preview, Google Search Console code, structured data).
-// The page templates live in /views; the page itself still builds its content in the browser.
+// The page templates live in /views; the homepage and product pages arrive with their content already in the HTML.
 const fs = require('fs');
 const path = require('path');
 const { getQuery, getSettings, getCategories, getProducts, findBySlug, productSlug, withSlug, siteBase } = require('./_lib');
 const { getTracking } = require('./_track');
 const { renderProduct, renderNotFound, priceRange } = require('./_pdp');
+const { savedSections, pickSections, renderSections, renderBand } = require('./_home');
 
 const FILES = { index: 'index.html', products: 'products.html', product: 'product.html', cart: 'cart.html', categories: 'categories.html' };
 const templates = {};
@@ -46,7 +47,7 @@ module.exports = async (req, res) => {
     const abs = (u) => (!u ? '' : /^https?:\/\//i.test(u) ? u : base + (u.startsWith('/') ? '' : '/') + u);
     const site = settings.storeName || 'Janissary Wear';
     const m = { site, gsc: trk.gscCode, url: base + '/', title: site, description: settings.tagline || '', image: base + '/img/share.jpg' };
-    let status = 200, extra = '', body = '';
+    let status = 200, extra = '', body = '', home = '', band = '';
 
     if (name === 'index') {
       m.title = `${site} | ${settings.tagline || 'Streetwear'}`;
@@ -56,6 +57,11 @@ module.exports = async (req, res) => {
         { '@context': 'https://schema.org', '@type': 'Organization', name: site, url: base + '/', logo: base + '/img/logo.png', ...(sameAs.length ? { sameAs } : {}), ...(settings.phone ? { contactPoint: { '@type': 'ContactPoint', telephone: settings.phone, contactType: 'customer service' } } : {}) },
         { '@context': 'https://schema.org', '@type': 'WebSite', name: site, url: base + '/' },
       ];
+      // the product rows and the delivery band are built here, so the homepage arrives complete
+      const products = (await getProducts()).filter((x) => x.active !== false);
+      home = renderSections(pickSections(await savedSections(), products, cats), cats);
+      band = renderBand(settings);
+      if (settings.announcement) extra = `<script>window.__ANN__=${JSON.stringify(settings.announcement).replace(/</g, '\\u003c')};</script>\n  <style>html #chrome-top{min-height:107px}@media(max-width:860px){html #chrome-top{min-height:88px}}</style>`;   // room for the announcement bar
     } else if (name === 'products') {
       const cat = cats.find((c) => c.slug === q.category);
       const parent = cat && cat.parent ? cats.find((c) => c.slug === cat.parent) : null;
@@ -109,7 +115,7 @@ const shippingDetails = [ship(settings.shippingInside, 'Dhaka'), ship(settings.s
       }
     }
 
-    const html = template(name).replace('<!--SEO-->', () => head(m) + (extra ? '\n  ' + extra : '')).replace('<!--PRODUCT-->', () => body);
+    const html = template(name).replace('<!--SEO-->', () => head(m) + (extra ? '\n  ' + extra : '')).replace('<!--PRODUCT-->', () => body).replace('<!--HOME-->', () => home).replace('<!--BAND-->', () => band);
     res.statusCode = status;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', status === 200 ? 'public, s-maxage=60, stale-while-revalidate=300' : 'no-store');

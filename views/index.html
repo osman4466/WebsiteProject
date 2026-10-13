@@ -7,7 +7,8 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%230A0A0A'%3E%3Crect x='9' y='9' width='22' height='22'/%3E%3Crect x='9' y='9' width='22' height='22' transform='rotate(45 20 20)'/%3E%3C/g%3E%3Ccircle cx='20' cy='20' r='4.2' fill='%23D8B35A'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Montserrat:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Montserrat:wght@400;500;600;700&display=swap"></noscript>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -15,7 +16,7 @@
 
   <main>
     <h1 class="sr-only">Janissary Wear: men's and women's streetwear, cash on delivery across Bangladesh</h1>
-    <div id="sections"></div>
+    <div id="sections"><!--HOME--></div>
 
     <section class="section cat-strip" aria-labelledby="cat-h">
       <div class="wrap">
@@ -29,7 +30,7 @@
     </section>
 
     <section class="band on-dark" aria-label="Delivery">
-      <div class="wrap band-grid" id="band"></div>
+      <div class="wrap band-grid" id="band"><!--BAND--></div>
     </section>
   </main>
 
@@ -39,39 +40,14 @@
   <script src="/js/track.js"></script>
   <script>
     JW.renderChrome('home');
-
-    const sectionsBox = document.getElementById('sections');
-    sectionsBox.innerHTML = '<div class="wrap home-sec"><div class="car-track">' +
-      Array.from({ length: 4 }, () => '<div class="skeleton" style="flex:0 0 44vw;max-width:240px;aspect-ratio:4/5"></div>').join('') + '</div></div>';
     document.getElementById('cats').innerHTML = Array.from({ length: 2 }, () => '<div class="skeleton" style="aspect-ratio:4/3"></div>').join('');
 
-    // sections come from Admin > Homepage (carousels and grids, in the order you set)
-    Promise.all([JW.loadCats(), JW.api('home')]).then(([cats, home]) => {
-      sectionsBox.innerHTML = home.sections.length
-        ? home.sections.map((s) => `
-          <section class="home-sec" aria-label="${JW.esc(s.title)}"><div class="wrap">
-            <div class="section-head"><h2>${JW.esc(s.title)}</h2><a class="link-more" href="${JW.esc(s.link)}">View all</a></div>
-            ${s.type === 'grid' ? `<div class="product-grid">${s.products.map((p) => JW.productCard(p, cats)).join('')}</div>` : JW.carousel(s.products, cats)}
-          </div></section>`).join('')
-        : '<div class="wrap home-sec"><div class="empty"><h3>The first drop is being prepared</h3><p>New pieces will appear here as soon as they are added.</p></div></div>';
-
+    JW.loadCats().then((cats) => {
       const tops = JW.tops(cats);
       document.getElementById('cats').innerHTML = tops.length ? tops.map((c) => JW.catTile(c)).join('') : '';
       document.getElementById('styles').innerHTML = tops.filter((t) => JW.kidsOf(t.slug, cats).length).map((t) =>
         `<div class="style-row"><h3>${JW.esc(t.name)}</h3>${JW.kidsOf(t.slug, cats).map((k) => `<a class="chip" href="${JW.catUrl(k.slug)}">${JW.esc(k.name)}</a>`).join('')}</div>`).join('');
-    }).catch((e) => {
-      sectionsBox.innerHTML = `<div class="wrap home-sec"><div class="empty"><h3>Could not load products</h3><p>${JW.esc(e.message)}</p></div></div>`;
-      document.getElementById('cats').innerHTML = '';
-    });
-
-    document.addEventListener('jw:settings', (ev) => {
-      const s = ev.detail;
-      const free = s.freeShippingOver > 0 ? `Free delivery on orders over ${JW.money(s.freeShippingOver)}.` : '';
-      document.getElementById('band').innerHTML = `
-        <div>${JW.STAR('#D8B35A', '#0A0A0A').replace('<svg', '<svg class="star"')}<h3>Pay on delivery</h3><p>Check your order first, then pay the courier. No card needed.</p></div>
-        <div>${JW.STAR('#D8B35A', '#0A0A0A').replace('<svg', '<svg class="star"')}<h3>Inside Dhaka ${JW.money(s.shippingInside)}</h3><p>Outside Dhaka ${JW.money(s.shippingOutside)}. ${JW.esc(free)}</p></div>
-        <div>${JW.STAR('#D8B35A', '#0A0A0A').replace('<svg', '<svg class="star"')}<h3>No account needed</h3><p>Pick your size, add your address and place the order in a minute.</p></div>`;
-    });
+    }).catch(() => { document.getElementById('cats').innerHTML = ''; });
   </script>
 </body>
 </html>
