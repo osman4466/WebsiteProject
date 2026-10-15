@@ -82,7 +82,7 @@
   }
 
   // ---------- images ----------
-  function compress(file, max = 1100) {
+  function compress(file, max = 900) {
     return new Promise((resolve, reject) => {
       if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error('Please use JPG, PNG or WEBP images'));
       const url = URL.createObjectURL(file);
@@ -95,8 +95,8 @@
         ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
         ctx.drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        let q = 0.84, out = c.toDataURL('image/jpeg', q);
-        while (out.length > 650 * 1024 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+        let q = 0.8, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 450 * 1024 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
         resolve(out);
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read this image')); };
