@@ -1,12 +1,14 @@
 // GET /api/backup  (admin) -> one JSON file with everything needed to move the store to another host.
 const { send, requireAdmin, getProducts, getCategories, getSettings, dbGet } = require('./_lib');
+const { listOrders, ensureMigrated } = require('./_orders');
 
 module.exports = async (req, res) => {
   try {
     if (!requireAdmin(req, res)) return;
     if (req.method !== 'GET') return send(res, 405, { error: 'Method not allowed' });
+    await ensureMigrated();
     const [products, categories, settings, orders, media, homepage, tracking] = await Promise.all([
-      getProducts(), getCategories(), getSettings(), dbGet('orders', []), dbGet('media', []), dbGet('homepage', null), dbGet('tracking', null),
+      getProducts(), getCategories(), getSettings(), listOrders(0), dbGet('media', []), dbGet('homepage', null), dbGet('tracking', null),
     ]);
     return send(res, 200, {
       app: 'janissary-wear',

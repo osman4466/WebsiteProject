@@ -10,7 +10,7 @@
 
   // authenticated API call; a 401 sends the admin back to the login screen
   const A = (path, opts = {}) =>
-    api(path, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } })
+    api(path + (path.includes('?') ? '&' : '?') + 'a=1', { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } })
       .catch((e) => { if (/Unauthorized/i.test(e.message)) logout('Your session ended. Please log in again.'); throw e; });
 
   const fmtDate = (t) => new Date(t).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -62,7 +62,7 @@
 
   // ---------- data ----------
   async function loadAll() {
-    const [products, cats, orders, settings] = await Promise.all([A('products'), A('categories'), A('orders'), api('settings')]);
+    const [products, cats, orders, settings] = await Promise.all([A('products'), A('categories'), A('orders'), A('settings')]);
     Object.assign(S, { products, cats, orders, settings });
     updateChrome();
   }

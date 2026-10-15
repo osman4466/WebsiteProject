@@ -1,6 +1,6 @@
 const {
   send, getQuery, getBody, getProducts, getCategories, dbSet, isAdmin,
-  requireAdmin, uid, clean, withDescendants, withSlug,
+  requireAdmin, uid, clean, withDescendants, withSlug, stockSet, stockDrop,
 } = require('./_lib');
 
 function normalize(b, cur = {}) {
@@ -65,10 +65,11 @@ module.exports = async (req, res) => {
 
     if (req.method === 'GET') {
       let list = await getProducts();
-      if (!isAdmin(req)) list = list.filter((p) => p.active !== false);
+      const admin = isAdmin(req);
+      if (!admin) list = list.filter((p) => p.active !== false);
       if (q.id) {
         const p = list.find((x) => x.id === q.id);
-        return p ? send(res, 200, withSlug(p)) : send(res, 404, { error: 'Product not found' });
+        return p ? send(res, 200, withSlug(p), admin ? 0 : 30) : send(res, 404, { error: 'Product not found' });
       }
       if (q.category) {
         // a main category (like Men) also shows everything inside its sub-categories
@@ -82,7 +83,7 @@ module.exports = async (req, res) => {
       }
       list = list.slice().sort(q.sort === 'new' ? byNew : byOrder);
       if (q.limit) list = list.slice(0, Math.max(1, Number(q.limit) || 20));
-      return send(res, 200, list.map(withSlug));
+      return send(res, 200, list.map(withSlug), admin ? 0 : 30);
     }
 
     if (!requireAdmin(req, res)) return;
@@ -99,6 +100,7 @@ module.exports = async (req, res) => {
       const p = { id: uid('p'), ...data, order: orders.length ? Math.min(...orders) - 1 : 0, createdAt: Date.now() };
       products.push(p);
       await dbSet('products', products);
+      await stockSet(p);
       return send(res, 201, p);
     }
 
@@ -123,14 +125,18 @@ module.exports = async (req, res) => {
       if (!data.price) return send(res, 400, { error: 'Price is required' });
       const cats = await getCategories();
       if (!cats.some((c) => c.slug === data.category)) return send(res, 400, { error: 'Please choose a valid category' });
-      products[i] = { ...products[i], ...data, updatedAt: Date.now() };
+      const old = products[i];
+      products[i] = { ...old, ...data, updatedAt: Date.now() };
       await dbSet('products', products);
+      await stockSet(products[i], old);
       return send(res, 200, products[i]);
     }
 
     if (req.method === 'DELETE') {
-      if (!products.some((p) => p.id === q.id)) return send(res, 404, { error: 'Product not found' });
+      const gone = products.find((p) => p.id === q.id);
+      if (!gone) return send(res, 404, { error: 'Product not found' });
       await dbSet('products', products.filter((p) => p.id !== q.id));
+      await stockDrop(gone);
       return send(res, 200, { ok: true });
     }
 

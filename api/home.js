@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
       }
       const products = (await getProducts()).filter((p) => p.active !== false);
       const out = pickSections(sections, products, await getCategories());
-      return send(res, 200, { sections: out.map((s) => ({ ...s, products: s.products.map(withSlug) })) });
+      return send(res, 200, { sections: out.map((s) => ({ ...s, products: s.products.map(withSlug) })) }, 60);
     }
 
     if (!requireAdmin(req, res)) return;

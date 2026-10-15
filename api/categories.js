@@ -1,5 +1,5 @@
 const {
-  send, getQuery, getBody, getCategories, getProducts, dbSet,
+  send, getQuery, getBody, getCategories, getProducts, dbSet, isAdmin,
   requireAdmin, uid, slugify, clean, withDescendants,
 } = require('./_lib');
 
@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
       return send(res, 200, cats.map((c) => ({
         ...c,
         count: products.filter((p) => withDescendants(cats, c.slug).includes(p.category)).length,
-      })));
+      })), isAdmin(req) ? 0 : 60);
     }
 
     if (!requireAdmin(req, res)) return;

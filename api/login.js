@@ -1,4 +1,4 @@
-const { send, getBody, sign, safeEqual } = require('./_lib');
+const { send, getBody, sign, safeEqual, rateLimit } = require('./_lib');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
@@ -10,6 +10,8 @@ module.exports = async (req, res) => {
       error: 'ADMIN_EMAIL / ADMIN_PASSWORD is not set. Add them in Vercel -> Settings -> Environment Variables, then redeploy.',
     });
   }
+
+  if (await rateLimit(req, 'login', 10, 600)) return send(res, 429, { error: 'Too many login attempts. Please wait 10 minutes and try again.' });
 
   const body = await getBody(req);
   const email = String(body.email || '').trim().toLowerCase();

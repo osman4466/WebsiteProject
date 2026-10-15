@@ -1,23 +1,42 @@
+const crypto = require('crypto');
 const {
-  send, getQuery, getBody, getProducts, getSettings, dbGet, dbSet,
+  send, getQuery, getBody, getProducts, getSettings, redis, rateLimit,
+  stockField, stockReserve, stockAdjust,
   requireAdmin, uid, clean,
 } = require('./_lib');
 const { forward } = require('./_track');
 const { notifyOrder } = require('./_mail');
 const { trackOrders } = require('./_status');
+const { saveOrder, updateOrder, removeOrder, getOrder, listOrders, nextNumber, phoneKey, ensureMigrated } = require('./_orders');
 
 const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
 const variantOf = (p, size, color) => (p.variants || []).find((v) => (v.size || '') === (size || '') && (v.color || '') === (color || ''));
 
-// change the stock of one size + color (or of the whole product when it has no variants)
-function changeStock(p, size, color, delta) {
-  if (!p) return;
-  if (p.variants && p.variants.length) {
-    const v = variantOf(p, size, color);
-    if (v) v.stock = Math.max(0, v.stock + delta);
-    p.stock = p.variants.reduce((n, x) => n + x.stock, 0);
-  } else p.stock = Math.max(0, p.stock + delta);
+// what the customer's browser is told about a placed order
+const receipt = (o) => ({
+  number: o.number, eventId: o.id, subtotal: o.subtotal, shipping: o.shipping, total: o.total,
+  items: o.items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+});
+
+// the same cart sent twice within two minutes (double click, retry after a bad connection) is one order
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fingerprint = (customer, items) => 'idem:' + crypto.createHash('sha256').update(JSON.stringify([
+  phoneKey(customer.phone), items.map((i) => [i.id, i.size, i.color, i.qty].join('|')).sort(),
+])).digest('hex').slice(0, 32);
+
+// stock rows of an order: one row for each product + size + color (the same item twice in a cart is added up)
+function stockRows(items, products) {
+  const rows = new Map();
+  for (const it of items) {
+    const p = products.find((x) => x.id === it.id);
+    if (!p) continue;
+    const v = Array.isArray(p.variants) && p.variants.length ? variantOf(p, it.size, it.color) : null;
+    const field = stockField(p.id, v ? v.size : '', v ? v.color : '');
+    const row = rows.get(field) || { field, qty: 0, seed: v ? v.stock : p.stock, name: it.name };
+    row.qty += it.qty; rows.set(field, row);
+  }
+  return [...rows.values()];
 }
 
 module.exports = async (req, res) => {
@@ -42,6 +61,8 @@ module.exports = async (req, res) => {
       const reqItems = Array.isArray(b.items) ? b.items.slice(0, 30) : [];
       if (!reqItems.length) return send(res, 400, { error: 'Your cart is empty' });
 
+      if (await rateLimit(req, 'order', 30, 600)) return send(res, 429, { error: 'Too many orders from this device. Please wait a few minutes and try again.' });
+
       const products = await getProducts();
       const settings = await getSettings();
       const items = [];
@@ -62,78 +83,100 @@ module.exports = async (req, res) => {
         subtotal += unit * qty;
       }
 
-      const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
-      const shipping = free ? 0 : customer.area === 'outside' ? settings.shippingOutside : settings.shippingInside;
-
-      // reduce stock
-      for (const it of items) {
-        changeStock(products.find((x) => x.id === it.id), it.size, it.color, -it.qty);
+      // a repeat of an order that was just placed: answer with that order instead of making another one
+      const idem = fingerprint(customer, items);
+      if (!(await redis(['SET', idem, 'pending', 'NX', 'EX', '120']))) {
+        for (let i = 0; i < 16; i++) {
+          const prior = await redis(['GET', idem]);
+          if (prior && prior !== 'pending') { const o = await getOrder(prior); if (o) return send(res, 201, receipt(o)); break; }
+          await sleep(250);
+        }
+        return send(res, 409, { error: 'Your order is being placed. Please wait a moment and check again.' });
       }
-      await dbSet('products', products);
 
-      const orders = await dbGet('orders', []);
-      const order = {
-        id: uid('o'),
-        number: 'JW-' + Date.now().toString(36).toUpperCase().slice(-6),
-        items, subtotal, shipping, total: subtotal + shipping,
-        customer, status: 'pending', createdAt: Date.now(),
-      };
-            order.history = [{ status: 'pending', at: order.createdAt }];
-      orders.unshift(order);
-      await dbSet('orders', orders.slice(0, 2000));
-      // after the order is saved: tell Meta and Google about the purchase (the browser sends the same event with the same id, so it is counted once)
-      // and email the owner. Both run together and neither can hold the customer for more than a few seconds.
-      const t = b.tracking && typeof b.tracking === 'object' ? b.tracking : {};
-      let timer;
-      await Promise.race([
-        Promise.all([
-          forward(req, {
-            name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
-            items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-            fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
-          }),
-          notifyOrder(req, order, settings.storeName),
-        ]),
-        new Promise((resolve) => { timer = setTimeout(resolve, 5000); }),
-      ]);
-      clearTimeout(timer);
+      try {
+        const free = settings.freeShippingOver > 0 && subtotal >= settings.freeShippingOver;
+        const shipping = free ? 0 : customer.area === 'outside' ? settings.shippingOutside : settings.shippingInside;
 
-      return send(res, 201, {
-        number: order.number, eventId: order.id, subtotal, shipping, total: order.total,
-        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-      });
+        // take the stock in one step; if any item is short nothing is taken
+        const rows = stockRows(items, products);
+        const got = await stockReserve(rows);
+        if (!got.ok) {
+          await redis(['DEL', idem]);
+          const r = rows.find((x) => x.field === got.field);
+          return send(res, 400, { error: `Only ${got.have} left in stock for "${r ? r.name : 'this item'}"` });
+        }
+
+        const now = Date.now();
+        const order = {
+          id: uid('o'), number: await nextNumber(),
+          items, subtotal, shipping, total: subtotal + shipping,
+          customer, status: 'pending', createdAt: now, history: [{ status: 'pending', at: now }],
+        };
+        try { await saveOrder(order); } catch (e) {
+          for (const r of rows) await stockAdjust(r.field, r.qty, 0).catch(() => {});   // could not save: give the stock back
+          throw e;
+        }
+        await redis(['SET', idem, order.id, 'EX', '120']);
+
+        // after the order is saved: tell Meta and Google about the purchase (the browser sends the same event with the same id, so it is counted once)
+        // and email the owner. Both run together and neither can hold the customer for more than a few seconds.
+        const t = b.tracking && typeof b.tracking === 'object' ? b.tracking : {};
+        let timer;
+        await Promise.race([
+          Promise.all([
+            forward(req, {
+              name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
+              items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+              fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
+            }),
+            notifyOrder(req, order, settings.storeName),
+          ]),
+          new Promise((resolve) => { timer = setTimeout(resolve, 5000); }),
+        ]);
+        clearTimeout(timer);
+
+        return send(res, 201, receipt(order));
+      } catch (e) {
+        await redis(['DEL', idem]).catch(() => {});
+        throw e;
+      }
     }
 
     // ---- Admin only below ----
     if (!requireAdmin(req, res)) return;
-    const orders = await dbGet('orders', []);
 
-    if (req.method === 'GET') return send(res, 200, orders);
+    if (req.method === 'GET') {
+      await ensureMigrated();
+      return send(res, 200, await listOrders(Math.min(5000, Number(q.limit) || 1000)));
+    }
 
     if (req.method === 'PUT') {
       const b = await getBody(req);
-      const i = orders.findIndex((o) => o.id === q.id);
-      if (i < 0) return send(res, 404, { error: 'Order not found' });
+      const o = await getOrder(q.id);
+      if (!o) return send(res, 404, { error: 'Order not found' });
       if (!STATUSES.includes(b.status)) return send(res, 400, { error: 'Invalid status' });
-      const prev = orders[i].status;
+      const prev = o.status;
 
       // put stock back if an order is cancelled (and take it again if re-opened)
       if (b.status !== prev && (b.status === 'cancelled' || prev === 'cancelled')) {
         const products = await getProducts();
-        for (const it of orders[i].items) {
-          const p = products.find((x) => x.id === it.id);
-          if (p) changeStock(p, it.size, it.color, b.status === 'cancelled' ? it.qty : -it.qty);
+        if (b.status === 'cancelled') {
+          for (const r of stockRows(o.items, products)) await stockAdjust(r.field, r.qty, r.seed);
+        } else {
+          const got = await stockReserve(stockRows(o.items, products));
+          if (!got.ok) return send(res, 409, { error: `Not enough stock to re-open this order (only ${got.have} left of one item).` });
         }
-        await dbSet('products', products);
       }
-            if (b.status !== prev) orders[i].history = [...(orders[i].history || []), { status: b.status, at: Date.now() }];
-      orders[i].status = b.status;
-      await dbSet('orders', orders);
-      return send(res, 200, orders[i]);
+      if (b.status !== prev) o.history = [...(o.history || []), { status: b.status, at: Date.now() }];
+      o.status = b.status;
+      await updateOrder(o);
+      return send(res, 200, o);
     }
 
     if (req.method === 'DELETE') {
-      await dbSet('orders', orders.filter((o) => o.id !== q.id));
+      const o = await getOrder(q.id);
+      if (o) await removeOrder(o);
       return send(res, 200, { ok: true });
     }
 
