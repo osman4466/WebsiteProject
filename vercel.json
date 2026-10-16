@@ -57,11 +57,27 @@
     },
     {
       "source": "/sitemap.xml",
-      "destination": "/api/sitemap"
+      "destination": "/api/g?__h=sitemap"
     },
     {
       "source": "/robots.txt",
-      "destination": "/api/robots"
+      "destination": "/api/g?__h=robots"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/g?__h=health"
+    },
+    {
+      "source": "/api/login",
+      "destination": "/api/g?__h=login"
+    },
+    {
+      "source": "/api/backup",
+      "destination": "/api/g?__h=backup"
+    },
+    {
+      "source": "/api/notify",
+      "destination": "/api/g?__h=notify"
     }
   ],
   "functions": {
