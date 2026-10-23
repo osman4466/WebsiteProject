@@ -8,7 +8,8 @@ function findEnv(re) {
   const k = Object.keys(process.env).find((name) => re.test(name) && process.env[name]);
   return k ? process.env[k] : undefined;
 }
-const REDIS_URL = findEnv(/(^|_)(KV_REST_API_URL|UPSTASH_REDIS_REST_URL)$/);
+const rawRedisUrl = findEnv(/(^|_)(KV_REST_API_URL|UPSTASH_REDIS_REST_URL)$/);
+const REDIS_URL = rawRedisUrl ? rawRedisUrl.replace(/\/+$/, '') : undefined;
 const REDIS_TOKEN = findEnv(/(^|_)(KV_REST_API_TOKEN|UPSTASH_REDIS_REST_TOKEN)$/);
 const HAS_REDIS = !!(REDIS_URL && REDIS_TOKEN);
 const ON_VERCEL = !!process.env.VERCEL;
@@ -21,8 +22,8 @@ async function redisRest(cmd) {
     headers: { Authorization: 'Bearer ' + REDIS_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify(cmd),
   });
-  const j = await r.json();
-  if (j.error) throw new Error('Redis: ' + j.error);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error('Redis: ' + ((j && j.error) || 'HTTP ' + r.status));
   return j.result;
 }
 
@@ -32,8 +33,8 @@ async function pipeRest(cmds) {
     headers: { Authorization: 'Bearer ' + REDIS_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify(cmds),
   });
-  const j = await r.json();
-  if (!Array.isArray(j)) throw new Error('Redis: ' + ((j && j.error) || 'bad reply'));
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !Array.isArray(j)) throw new Error('Redis: ' + ((j && j.error) || 'HTTP ' + r.status || 'bad reply'));
   return j.map((x) => { if (x.error) throw new Error('Redis: ' + x.error); return x.result; });
 }
 
@@ -138,7 +139,7 @@ async function stockReserve(rows) {
   return r[0] === 1 ? { ok: true } : { ok: false, field: r[1], have: Number(r[2]) };
 }
 async function stockAdjust(field, delta, seed) {
-  await pipe([['HSETNX', 'stock', field, Math.max(0, seed)], ['HINCRBY', 'stock', field, delta]]);
+  await pipe([['HSETNX', 'stock', field, Math.max(0, Math.floor(Number(seed) || 0))], ['HINCRBY', 'stock', field, delta]]);
 }
 // the owner saved a product: write its stock (and forget sizes/colors it no longer has)
 async function stockSet(p, old) {

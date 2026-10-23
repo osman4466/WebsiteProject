@@ -10,7 +10,21 @@ const { savedSections, pickSections, renderSections, renderBand } = require('./_
 
 const FILES = { index: 'index.html', products: 'products.html', product: 'product.html', cart: 'cart.html', categories: 'categories.html' };
 const templates = {};
-const template = (name) => templates[name] || (templates[name] = fs.readFileSync(path.join(__dirname, '..', 'views', FILES[name]), 'utf8'));
+function template(name) {
+  if (templates[name]) return templates[name];
+  const file = FILES[name];
+  const candidates = [
+    path.join(__dirname, '..', 'views', file),
+    path.join(process.cwd(), 'views', file),
+    path.join(__dirname, 'views', file),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return (templates[name] = fs.readFileSync(p, 'utf8'));
+    }
+  }
+  return (templates[name] = fs.readFileSync(candidates[0], 'utf8'));
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ld = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
