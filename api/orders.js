@@ -128,7 +128,7 @@ module.exports = async (req, res) => {
             forward(req, {
               name: 'Purchase', eventId: order.id, url: t.url, value: order.total,
               items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-              fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name },
+              fbp: t.fbp, fbc: t.fbc, gaClientId: t.gaClientId, user: { phone: customer.phone, name: customer.name, city: customer.area === 'inside' ? 'dhaka' : '' },
             }),
             notifyOrder(req, order, settings.storeName),
           ]),
