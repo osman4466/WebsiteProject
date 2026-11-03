@@ -68,7 +68,7 @@ function sanitize(b) {
     url: clean(b.url, 400), items,
     value: num(b.value), search: clean(b.search, 120), category: clean(b.category, 120),
     fbp: clean(b.fbp, 120), fbc: clean(b.fbc, 200), gaClientId: clean(b.gaClientId, 60),
-    user: { phone: clean(b.user && b.user.phone, 30), name: clean(b.user && b.user.name, 80) },
+    user: { phone: clean(b.user && b.user.phone, 30), name: clean(b.user && b.user.name, 80), city: clean(b.user && b.user.city, 40) },
   };
 }
 
@@ -83,6 +83,7 @@ function metaPayload(e, req) {
     fn: name[0] ? [sha(name[0])] : undefined,
     ln: name.length > 1 ? [sha(name.slice(1).join(' '))] : undefined,
     external_id: ph ? [ph] : undefined,
+    ct: e.user.city ? [sha(e.user.city)] : undefined,
     country: [sha('bd')],
   });
   const custom = compact({
